@@ -1,0 +1,237 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/tailscale/jobs/4732874005",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 4454065005,
+      "location": {
+        "name": "Remote (Canada)"
+      },
+      "metadata": [
+        {
+          "id": 4536497005,
+          "name": "Employment Type",
+          "value": "Full-time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 4732874005,
+      "updated_at": "2026-09-29T20:38:27-04:00",
+      "requisition_id": "EVG-ENG-DP",
+      "title": "Software Engineer, Networking (Dataplane)",
+      "company_name": "Tailscale",
+      "first_published": "2026-09-10T15:56:15-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Thank you for considering Tailscale. If this job description resonates with you, please apply.&amp;nbsp;&lt;em data-stringify-type=&quot;italic&quot;&gt;Frequently cited statistics show that people who identify with historically marginalized groups are likely to apply to jobs only if they meet 100% of the qualifications. &lt;/em&gt;",
+      "departments": [
+        {
+          "id": 4019620005,
+          "name": "Engineering",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 4008467005,
+          "name": "Remote (Canada)",
+          "location": "Canada",
+          "child_ids": [],
+          "parent_id": null
+        },
+        {
+          "id": 4008466005,
+          "name": "Remote (United States) ",
+          "location": "United States",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/tailscale/jobs/4732897005",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 4454065005,
+      "location": {
+        "name": "Remote (United States)"
+      },
+      "metadata": [
+        {
+          "id": 4536497005,
+          "name": "Employment Type",
+          "value": "Full-time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 4732897005,
+      "updated_at": "2026-09-29T20:38:27-04:00",
+      "requisition_id": "EVG-ENG-DP",
+      "title": "Software Engineer, Networking (Dataplane)",
+      "company_name": "Tailscale",
+      "first_published": "2026-09-10T15:56:16-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Thank you for considering Tailscale. If this job description resonates with you, please apply.&amp;nbsp;&lt;em data-stringify-type=&quot;italic&quot;&gt;Frequently cited statistics show that people who identify with historically marginalized groups are likely to apply to jobs only if they meet 100% of the qualifications. &lt;/em&gt;",
+      "departments": [
+        {
+          "id": 4019620005,
+          "name": "Engineering",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 4008467005,
+          "name": "Remote (Canada)",
+          "location": "Canada",
+          "child_ids": [],
+          "parent_id": null
+        },
+        {
+          "id": 4008466005,
+          "name": "Remote (United States) ",
+          "location": "United States",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/tailscale/jobs/4740660005",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 4457856005,
+      "location": {
+        "name": "Hybrid (Toronto, Ontario)"
+      },
+      "metadata": [
+        {
+          "id": 4536497005,
+          "name": "Employment Type",
+          "value": "Full-time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 4740660005,
+      "updated_at": "2026-11-03T11:51:00-05:00",
+      "requisition_id": "EVG-SrNBAE-TOR",
+      "title": "Senior New Business Account Executive",
+      "company_name": "Tailscale",
+      "first_published": "2026-10-05T17:45:54-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Thank you for considering Tailscale. If this job description resonates with you, please apply.&amp;nbsp;&lt;em data-stringify-type=&quot;italic&quot;&gt;Frequently cited statistics show that people who identify with historically marginalized groups are likely to apply to jobs only if they meet 100% of the qualifications. &lt;/em&gt;",
+      "departments": [
+        {
+          "id": 4019621005,
+          "name": "Sales",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 4053580005,
+          "name": "Hybrid (Toronto)",
+          "location": "Toronto, Ontario, Canada",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/tailscale/jobs/4726020005",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 4450466005,
+      "location": {
+        "name": "Remote (Singapore)"
+      },
+      "metadata": [
+        {
+          "id": 4536497005,
+          "name": "Employment Type",
+          "value": "Full-time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 4726020005,
+      "updated_at": "2026-09-29T20:38:27-04:00",
+      "requisition_id": "392",
+      "title": "Director, APAC Go-to-Market",
+      "company_name": "Tailscale",
+      "first_published": "2026-08-31T19:51:26-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Thank you for considering Tailscale. If this job description resonates with you, please apply.&amp;nbsp;&lt;em data-stringify-type=&quot;italic&quot;&gt;Frequently cited statistics show that people who identify with historically marginalized groups are likely to apply to jobs only if they meet 100% of the qualifications. &lt;/em&gt;",
+      "departments": [
+        {
+          "id": 4019621005,
+          "name": "Sales",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 4059190005,
+          "name": "Remote (Singapore)",
+          "location": "Singapore",
+          "child_ids": [],
+          "parent_id": null
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    }
+  ],
+  "meta": {
+    "total": 4
+  }
+}
