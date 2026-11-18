@@ -9,14 +9,14 @@ It reads the public job-board APIs that companies already publish (Greenhouse, L
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TB
   boards["Company job boards<br/>Greenhouse · Lever · Ashby"]
 
-  subgraph runner["Private runner repo (daily Action)"]
+  subgraph runner["Private runner repo"]
     config["config/<br/>companies.json<br/>profiles.json"]
-    ingest["ingest.yml@v1<br/>fetch → normalize →<br/>location rules → title filter →<br/>diff vs. last run"]
+    ingest["ingest.yml@v1, daily<br/>fetch<br/>→ normalize<br/>→ location rules<br/>→ title filter<br/>→ diff vs. last run"]
     state[("Seen-jobs state<br/>Actions cache")]
-    artifact[/"Artifact<br/>jobs.jsonl · open.json<br/>report.json"/]
+    artifact[/"Artifact<br/>jobs.jsonl<br/>open.json<br/>report.json"/]
   end
 
   subgraph laptop["Your laptop"]
@@ -25,6 +25,7 @@ flowchart LR
     app["App · TanStack Start<br/>/jobs · /runs"]
   end
 
+  boards ~~~ config
   boards -->|public JSON APIs| ingest
   config --> ingest
   state <-->|restore / save| ingest
