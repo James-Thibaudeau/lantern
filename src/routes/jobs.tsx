@@ -155,6 +155,9 @@ function JobsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/watchlist" className="text-sm text-zinc-500 hover:underline">
+            Watchlist
+          </Link>
           <Link to="/runs" className="text-sm text-zinc-500 hover:underline">
             Runs
           </Link>

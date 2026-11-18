@@ -13,10 +13,18 @@ const USAGE = `Usage:
   pnpm cli init-runner <repo-name> [--dir <path>] [--local-only]
   pnpm cli sync [--from <dir>] [--db <file>]      (also: pnpm sync)
   pnpm cli run [--full-resend] [--dry-run] [--companies <a,b>]
+  pnpm cli detect-ats <url> [--name <company>] [--add] [--config <dir>]
+  pnpm cli hn-suggest [--thread <id>] [--config <dir>]
+  pnpm cli suggestions [list [--all] | accept <id> | reject <id>] [--config <dir>]
 
 sync pulls new runner results from GitHub into SQLite (data/lantern.db). It needs
 LANTERN_RUNNER_REPO in .env, and LANTERN_GITHUB_TOKEN or a gh CLI login. --from applies
 a local \`ingest --out <dir>\` result instead. run starts the runner workflow now.
+
+detect-ats finds a company's job board from a posting or careers-page URL; --add puts it
+on your watchlist. hn-suggest finds companies in HN's latest "Who is hiring?" thread.
+Both read and update the watchlist in your runner repo on GitHub (the token needs
+Contents read/write), or in a local folder with --config.
 
 init-runner creates your private runner repo from runner-template/ (default folder:
 ../<repo-name>) and pushes it to GitHub with the gh CLI. --local-only skips GitHub.
@@ -198,6 +206,12 @@ async function main() {
       return (await import('#/sync/commands')).syncCommand(rest)
     case 'run':
       return (await import('#/sync/commands')).runCommand(rest)
+    case 'detect-ats':
+      return (await import('#/watchlist/commands')).detectAtsCommand(rest)
+    case 'hn-suggest':
+      return (await import('#/watchlist/commands')).hnSuggestCommand(rest)
+    case 'suggestions':
+      return (await import('#/watchlist/commands')).suggestionsCommand(rest)
     case 'init-runner':
       return initRunnerCommand(rest)
     case undefined:

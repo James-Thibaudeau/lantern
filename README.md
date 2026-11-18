@@ -4,7 +4,7 @@ Lantern finds job postings on company job boards, keeps the ones that match what
 
 It reads the public job-board APIs that companies already publish (Greenhouse, Lever and Ashby today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
 
-> **Status:** ingestion, the daily Action and local sync into SQLite work end to end, with a jobs page and run history. Ranking and resume tailoring are next.
+> **Status:** ingestion, the daily Action, local sync into SQLite and watchlist tools work end to end, with jobs, watchlist and run-history pages. Ranking and resume tailoring are next.
 
 ## How it works
 
@@ -65,7 +65,7 @@ pnpm cli init-runner my-lantern-runner
 
 This creates a **private** repo from [`runner-template/`](runner-template) and pushes it with the GitHub CLI. Edit its `config/companies.json` and `config/profiles.json`, and its workflow runs every morning. See the [runner README](runner-template/README.md) for the config format and manual runs.
 
-Then point the app at it: copy `.env.example` to `.env` and set `LANTERN_RUNNER_REPO`. For the token, create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) for the runner repo only, with **Actions** and **Contents** read and write, and set `LANTERN_GITHUB_TOKEN`. (Without one, sync falls back to your `gh` CLI login.)
+Then point the app at it: copy `.env.example` to `.env` and set `LANTERN_RUNNER_REPO`. For the token, create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) for the runner repo only, with **Actions** read and write (sync, Run now) and **Contents** read and write (the watchlist), and set `LANTERN_GITHUB_TOKEN`. (Without one, sync falls back to your `gh` CLI login.)
 
 ```bash
 pnpm sync                 # pull new runs into SQLite
@@ -75,6 +75,20 @@ pnpm cli run --full-resend   # if sync reports missed results
 
 The app also syncs when it starts, and has Sync and Run now buttons on `/jobs` and a run history on `/runs`.
 
+## Growing the watchlist
+
+```bash
+pnpm cli detect-ats https://jobs.ashbyhq.com/acme/…   # or any careers-page URL
+pnpm cli detect-ats https://acme.com/careers --add    # and add it to your watchlist
+pnpm cli hn-suggest                                   # companies from HN's latest "Who is hiring?"
+pnpm cli suggestions                                  # then: suggestions accept|reject <id>
+```
+
+- **`detect-ats`** reads a board link directly (Greenhouse, Lever, Ashby; Workday, BambooHR and a few others are recognized but not supported yet). For a company's own site, it looks for a board linked in the page, then tries the company name as a slug on each board. Every result is checked against the real API: how many jobs are open, and how many pass your profile today.
+- **`hn-suggest`** reads the latest HN "Who is hiring?" thread, keeps posts that mention Canada or remote work, finds each company's board the same way, and saves the new ones as suggestions, sorted by matching jobs. Companies you've accepted or rejected aren't suggested again.
+- **Guessed boards** are labelled, since another company can own the same slug. Greenhouse reports a board's company name, so a guessed Greenhouse board whose name doesn't fit is dropped; for Ashby and Lever, open the board to check.
+- The **`/watchlist`** page does all of this in the app: add from a URL, check HN, and accept or reject suggestions. Accepting commits one line to `config/companies.json` in your runner repo (the token needs Contents read/write); the next run picks it up. Every command also takes `--config <dir>` to use a local folder instead.
+
 ## Development
 
 | Command                         | What it does                                           |
@@ -82,6 +96,7 @@ The app also syncs when it starts, and has Sync and Run now buttons on `/jobs` a
 | `pnpm dev`                      | App at http://localhost:3000                           |
 | `pnpm cli ingest …`             | Ingestion CLI (`pnpm cli --help`)                      |
 | `pnpm sync`                     | Pull new runner results into `data/lantern.db`         |
+| `pnpm cli hn-suggest`           | Suggest companies from HN's "Who is hiring?"           |
 | `pnpm db:generate`              | New migration after editing `src/db/schema.ts`         |
 | `pnpm check`                    | Format check, lint, typecheck and tests (what CI runs) |
 | `pnpm format` / `pnpm lint:fix` | Fix formatting / auto-fixable lint                     |
@@ -95,6 +110,7 @@ src/routes/           app pages
 src/server/           server functions
 src/db/               SQLite schema (Drizzle); migrations in drizzle/
 src/sync/             GitHub client and sync
+src/watchlist/        detect-ats, HN miner, suggestions, runner config edits
 runner-template/      what `init-runner` copies into your private runner repo
 .github/workflows/    ci.yml, and ingest.yml (the reusable workflow runners call)
 ```

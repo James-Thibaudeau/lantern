@@ -143,6 +143,15 @@ function placeFromRegionCode(text: string): Place | null | undefined {
   return undefined
 }
 
+/** True if free text names Canada, a province, or a Canadian city (used by the HN miner). */
+export function mentionsCanada(text: string): boolean {
+  if (CA_COUNTRY.test(text) || CA_CODE.test(text) || CA_PROVINCES.test(text)) return true
+  if (CA_CITIES.test(text)) return true
+  return [...text.matchAll(REGION_CODE)].some(
+    (m) => CA_PROVINCE_CODES.has(m[1]) && !ALSO_COUNTRY_CODES.has(m[1]),
+  )
+}
+
 function detectPlace(text: string): Place | null {
   // 1. Country names and codes are the strongest signal.
   if (CA_COUNTRY.test(text) || CA_CODE.test(text)) return { kind: 'CA' }

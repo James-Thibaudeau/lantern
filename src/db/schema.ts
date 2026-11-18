@@ -89,3 +89,37 @@ export const companies = sqliteTable('companies', {
 export type JobRowDb = typeof jobs.$inferSelect
 export type IngestRunRow = typeof ingestRuns.$inferSelect
 export type CompanyRow = typeof companies.$inferSelect
+
+/** Companies suggested for the watchlist (HN miner, detect-ats), waiting for a decision. */
+export const suggestions = sqliteTable(
+  'suggestions',
+  {
+    /** "<ats>:<slug>", lowercased slug. */
+    id: text('id').primaryKey(),
+    ats: text('ats').notNull(),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    /** The companies.json entry to add, as JSON; null when we can't read this board yet. */
+    company: text('company'),
+    supported: integer('supported', { mode: 'boolean' }).notNull(),
+    note: text('note'),
+    /** How the board was found: linked directly, found on the company's page, or guessed. */
+    via: text('via', { enum: ['link', 'page', 'guess'] }).notNull(),
+    source: text('source', { enum: ['hn', 'url'] }).notNull(),
+    sourceUrl: text('source_url'),
+    /** The HN post's first line, or the URL given to detect-ats. */
+    sourceText: text('source_text'),
+    openJobs: integer('open_jobs'),
+    matchingJobs: integer('matching_jobs'),
+    checkError: text('check_error'),
+    checkedAt: text('checked_at').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected'] })
+      .notNull()
+      .default('pending'),
+    createdAt: text('created_at').notNull(),
+    decidedAt: text('decided_at'),
+  },
+  (t) => [index('suggestions_status_idx').on(t.status)],
+)
+
+export type SuggestionRow = typeof suggestions.$inferSelect

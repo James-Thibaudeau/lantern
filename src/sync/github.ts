@@ -28,6 +28,13 @@ export class GitHubAuthError extends Error {
   override name = 'GitHubAuthError'
 }
 
+/** A file changed on GitHub between reading and writing it. */
+export class GitHubConflictError extends Error {
+  override name = 'GitHubConflictError'
+}
+
+const FileResponse = z.object({ content: z.string(), sha: z.string(), encoding: z.string() })
+
 const RunsResponse = z.object({
   workflow_runs: z.array(
     z.object({ id: z.number(), created_at: z.string(), html_url: z.string() }),
@@ -61,7 +68,12 @@ export class GitHubRunner implements RunSource {
     this.fetchImpl = opts.fetchImpl ?? fetch
   }
 
-  private async request(url: string, init: RequestInit = {}): Promise<Response> {
+  private async request(
+    url: string,
+    init: RequestInit = {},
+    /** Which token permission this call needs, for the error message. */
+    permission: 'Actions' | 'Contents' = 'Actions',
+  ): Promise<Response> {
     const res = await this.fetchImpl(url, {
       ...init,
       headers: {
@@ -79,9 +91,10 @@ export class GitHubRunner implements RunSource {
     if (res.status === 403 || res.status === 404) {
       throw new GitHubAuthError(
         `GitHub said ${res.status} for ${this.opts.repo}: the repo doesn't exist, or the token ` +
-          "can't access it (it needs Actions read/write on that repo).",
+          `can't access it (it needs ${permission} read/write on that repo).`,
       )
     }
+    if (res.status === 409) throw new GitHubConflictError(`GitHub said 409 (conflict) for ${url}`)
     if (!res.ok) throw new Error(`GitHub API ${res.status} for ${url}`)
     return res
   }
@@ -129,6 +142,35 @@ export class GitHubRunner implements RunSource {
         },
       }),
     })
+  }
+
+  /** Reads a text file from the runner repo's main branch. */
+  async getFile(path: string): Promise<{ text: string; sha: string }> {
+    const res = await this.request(
+      `${this.api}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=main`,
+      {},
+      'Contents',
+    )
+    const body = FileResponse.parse(await res.json())
+    if (body.encoding !== 'base64') throw new Error(`Unexpected encoding for ${path}`)
+    return { text: Buffer.from(body.content, 'base64').toString('utf8'), sha: body.sha }
+  }
+
+  /** Commits a new version of a file to main. `sha` is the version it replaces. */
+  async putFile(path: string, text: string, sha: string, message: string): Promise<void> {
+    await this.request(
+      `${this.api}/contents/${path.split('/').map(encodeURIComponent).join('/')}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          message,
+          content: Buffer.from(text, 'utf8').toString('base64'),
+          sha,
+          branch: 'main',
+        }),
+      },
+      'Contents',
+    )
   }
 
   get actionsUrl(): string {
