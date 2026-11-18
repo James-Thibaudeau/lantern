@@ -4,16 +4,25 @@ import { parseArgs } from 'node:util'
 import { loadConfig } from './config'
 import { createHttpClient } from './http'
 import { runIngest, type IngestResult } from './ingest'
+import { initRunner } from './init-runner'
 import { writeOutputs } from './output'
+import { applyState, readState, writeState, type SeenState } from './state'
 
 const USAGE = `Usage:
   pnpm cli ingest [options]
+  pnpm cli init-runner <repo-name> [--dir <path>] [--local-only]
 
-Options:
+init-runner creates your private runner repo from runner-template/ (default folder:
+../<repo-name>) and pushes it to GitHub with the gh CLI. --local-only skips GitHub.
+
+ingest options:
   --config <dir>       Folder with companies.json and profiles.json (default: config)
   --out <dir>          Where to write jobs.jsonl, open.json, report.json (default: out)
   --company <slug>     Only fetch this company. Repeatable.
   --companies <a,b>    Same, comma-separated (what the workflow input passes).
+  --state <file>       Seen-jobs state. jobs.jsonl then only holds new and updated jobs,
+                       and the file is updated after a successful run.
+  --full-resend        Ignore the saved state and send every kept job (state is still saved).
   --dry-run            Print the jobs and a summary; write nothing.
   --all                With --dry-run, also print jobs the filter dropped, and why.
   --json               With --dry-run, print full normalized jobs as JSON lines.
@@ -21,7 +30,31 @@ Options:
 
 Examples:
   pnpm cli ingest --config ../lantern-runner/config --company wealthsimple --dry-run
-  pnpm cli ingest --config ../lantern-runner/config --out out/`
+  pnpm cli ingest --config ../lantern-runner/config --out out/
+  pnpm cli init-runner my-lantern-runner`
+
+async function initRunnerCommand(argv: string[]) {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    options: {
+      dir: { type: 'string' },
+      'local-only': { type: 'boolean', default: false },
+    },
+    allowPositionals: true,
+    strict: true,
+  })
+  const [name] = positionals
+  if (!name || positionals.length > 1) {
+    console.error(`init-runner needs exactly one repo name\n\n${USAGE}`)
+    return 2
+  }
+  const { dir } = await initRunner({ name, dir: values.dir, localOnly: values['local-only'] })
+  console.log(`
+Next:
+  1. Edit ${dir}/config/companies.json and profiles.json, then commit and push.
+  2. Try a run: gh workflow run run.yml --repo <you>/${name} -f dryRun=true`)
+  return 0
+}
 
 function printSummary(result: IngestResult) {
   const { report } = result
@@ -53,6 +86,13 @@ function printSummary(result: IngestResult) {
     .map(([e, n]) => `${e} ${n}`)
     .join(' · ')
   console.log(`Eligibility of all ${t.normalized} jobs: ${elig}`)
+  const ch = report.changes
+  if (ch) {
+    const basis = ch.stateFound ? 'against saved state' : 'no saved state, so everything is new'
+    console.log(
+      `Changes (${basis}): ${ch.new} new · ${ch.updated} updated · ${ch.unchanged} unchanged`,
+    )
+  }
 }
 
 function printJobs(result: IngestResult, all: boolean, json: boolean) {
@@ -80,6 +120,8 @@ async function ingest(argv: string[]) {
       out: { type: 'string', default: 'out' },
       company: { type: 'string', multiple: true },
       companies: { type: 'string' },
+      state: { type: 'string' },
+      'full-resend': { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       all: { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
@@ -105,13 +147,33 @@ async function ingest(argv: string[]) {
     runId: process.env.GITHUB_RUN_ID,
   })
 
+  let emit = result.kept
+  let nextState: SeenState | null = null
+  if (values.state) {
+    const previous = values['full-resend'] ? { state: null } : await readState(values.state)
+    if (previous.warning) console.warn(previous.warning)
+    const applied = applyState(
+      result,
+      previous.state,
+      config.companies.map((c) => c.slug),
+    )
+    emit = applied.emit
+    nextState = applied.next
+    result.report.changes = applied.changes
+  }
+
   if (values['dry-run']) {
     printJobs(result, values.all, values.json)
     if (!values.json) printSummary(result)
   } else {
-    const files = await writeOutputs(values.out, result)
+    const files = await writeOutputs(values.out, result, emit)
     printSummary(result)
     console.log(`\nWrote ${files.jobs}, ${files.open}, ${files.report}`)
+    // A failed run keeps the old state, so nothing is lost before the next good run.
+    if (values.state && nextState && !result.report.failed) {
+      await writeState(values.state, nextState)
+      console.log(`Saved state to ${values.state} (${Object.keys(nextState.jobs).length} jobs)`)
+    }
   }
 
   if (result.report.failed) {
@@ -126,6 +188,8 @@ async function main() {
   switch (command) {
     case 'ingest':
       return ingest(rest)
+    case 'init-runner':
+      return initRunnerCommand(rest)
     case undefined:
     case '-h':
     case '--help':

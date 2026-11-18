@@ -1,0 +1,5 @@
+[
+  { "name": "GitLab", "ats": "greenhouse", "slug": "gitlab" },
+  { "name": "Sentry", "ats": "ashby", "slug": "sentry" },
+  { "name": "Fullscript", "ats": "lever", "slug": "fullscript" }
+]

@@ -1,179 +1,68 @@
-Welcome to your new TanStack Start app!
+# Lantern
 
-# Getting Started
+Lantern finds job postings on company job boards, keeps the ones that match what you're looking for, and shows them in a small local app.
 
-To run this application:
+It reads the public job-board APIs that companies already publish (Greenhouse, Lever and Ashby today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
+
+> **Status:** ingestion works end to end, and there's a simple jobs page. Local sync into SQLite, ranking and resume tailoring are next.
+
+## How it works
+
+```
+ company job boards ──► GitHub Action (daily, your private runner repo)
+ (Greenhouse, Lever,       fetch ► normalize ► location rules ► title filter ► diff vs. last run
+  Ashby)                                                │
+                                                        ▼
+                                  artifact: jobs.jsonl · open.json · report.json
+                                                        │
+                                                        ▼
+                                          local app (TanStack Start) ── /jobs
+```
+
+- **One adapter per source.** Each turns a board's raw postings into one shared, Zod-validated `Job` shape. A bad posting is reported and skipped; it never fails the company, and one failing company never fails the run.
+- **Rules first, LLM later.** Location eligibility (Canada on-site, hybrid, remote-OK, US-only and so on) is decided by rules in the Action, using structured fields first and location text second. The few jobs the rules can't place are kept and marked `unknown`, for a local LLM pass to resolve. No API keys ever go into the Action.
+- **Incremental and safe to repeat.** The Action keeps a small "seen jobs" state in its cache and sends only new and changed jobs. `open.json` lists every currently open job for companies that were fetched completely, so closed jobs can be detected without a failed fetch ever closing anything.
+- **Public code, private data.** This repo holds only code. Your watchlist, profiles, logs and results live in your own private runner repo, which calls this repo's reusable workflow at a pinned tag.
+- **Polite by default.** At most 4 companies at once, a pause between them, timeouts, retries with backoff, and a plain User-Agent.
+
+## Try it locally
+
+Needs Node 22 or newer (see `.nvmrc`) and pnpm 12.
 
 ```bash
 pnpm install
-pnpm dev
+pnpm cli init-runner my-lantern-runner --local-only   # makes ../my-lantern-runner with example config
+pnpm cli ingest --config ../my-lantern-runner/config --dry-run
+pnpm cli ingest --config ../my-lantern-runner/config --out out/
+pnpm dev                                               # then open http://localhost:3000/jobs
 ```
 
-# Building For Production
+`--dry-run --all` also lists the jobs the filter dropped, and why.
 
-To build this application for production:
+## Run it daily on GitHub
 
 ```bash
-pnpm build
+pnpm cli init-runner my-lantern-runner
 ```
 
-## Styling
+This creates a **private** repo from [`runner-template/`](runner-template) and pushes it with the GitHub CLI. Edit its `config/companies.json` and `config/profiles.json`, and its workflow runs every morning. See the [runner README](runner-template/README.md) for the config format and manual runs.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+## Development
 
-### Removing Tailwind CSS
+| Command                         | What it does                                           |
+| ------------------------------- | ------------------------------------------------------ |
+| `pnpm dev`                      | App at http://localhost:3000                           |
+| `pnpm cli ingest …`             | Ingestion CLI (`pnpm cli --help`)                      |
+| `pnpm check`                    | Format check, lint, typecheck and tests (what CI runs) |
+| `pnpm format` / `pnpm lint:fix` | Fix formatting / auto-fixable lint                     |
 
-If you prefer not to use Tailwind CSS:
+Stack: TypeScript 7, TanStack Start, Zod, Vitest, oxlint (type-aware, via tsrs) and oxfmt.
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from '@tanstack/react-router'
 ```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
+src/pipeline/         ingestion: adapters/, eligibility, filter, state, CLI
+src/pipeline/__tests__/  unit tests, with trimmed real API responses as fixtures
+src/routes/           app pages
+src/server/           server functions
+runner-template/      what `init-runner` copies into your private runner repo
+.github/workflows/    ci.yml, and ingest.yml (the reusable workflow runners call)
 ```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).

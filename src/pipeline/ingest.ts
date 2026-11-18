@@ -58,6 +58,16 @@ export interface IngestReport {
   /** Eligibility of every normalized job, kept or not. Useful for tuning the rules. */
   eligibility: Record<Eligibility, number>
   companies: CompanyReport[]
+  /** New/updated/unchanged against the seen-jobs state. Set by the CLI when state is used. */
+  changes?: Changes
+}
+
+export interface Changes {
+  /** False when there was no usable previous state (first run, evicted cache, full resend). */
+  stateFound: boolean
+  new: number
+  updated: number
+  unchanged: number
 }
 
 export interface OpenListing {

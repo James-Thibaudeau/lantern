@@ -1,0 +1,15 @@
+[
+  {
+    "id": "software-engineer",
+    "enabled": true,
+    "titleInclude": [
+      "software engineer",
+      "software developer",
+      "full stack",
+      "frontend",
+      "backend"
+    ],
+    "titleExclude": ["intern", "co-op", "manager", "director"],
+    "allowedEligibility": ["canada_onsite", "canada_hybrid", "remote_canada_ok", "unknown"]
+  }
+]

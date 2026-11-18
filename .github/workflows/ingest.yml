@@ -1,0 +1,139 @@
+# Reusable ingest workflow. A private runner repo calls it on a schedule:
+#
+#   jobs:
+#     ingest:
+#       uses: James-Thibaudeau/lantern/.github/workflows/ingest.yml@v1
+#       with:
+#         lantern_ref: v1
+#
+# It checks out the caller's config/ and this repo's code at `lantern_ref`, fetches every
+# watched company, and uploads jobs.jsonl, open.json and report.json as an artifact named
+# ingest-<run_id>. The seen-jobs state lives in the caller's Actions cache, never in git.
+name: Ingest
+
+on:
+  workflow_call:
+    inputs:
+      lantern_ref:
+        description: Tag of this repo to run. Pass the same tag as in `uses:`.
+        type: string
+        required: true
+      lantern_repository:
+        description: Repo that holds the Lantern code (change only for a fork).
+        type: string
+        default: James-Thibaudeau/lantern
+      companies:
+        description: Comma-separated company slugs to fetch (blank = all).
+        type: string
+        default: ''
+      dry_run:
+        description: Upload report.json only and don't save state.
+        type: boolean
+        default: false
+      full_resend:
+        description: Ignore saved state and send every kept job.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out runner config
+        uses: actions/checkout@v7
+        with:
+          path: runner
+          persist-credentials: false
+
+      - name: Check out Lantern ${{ inputs.lantern_ref }}
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.lantern_repository }}
+          ref: ${{ inputs.lantern_ref }}
+          path: lantern
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: lantern/.nvmrc
+          package-manager-cache: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: lantern/package.json
+          cache: true
+          cache_dependency_path: lantern/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: lantern
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore seen-jobs state
+        if: ${{ !inputs.full_resend }}
+        uses: actions/cache/restore@v6
+        with:
+          path: state
+          key: lantern-seen-${{ github.run_id }}
+          restore-keys: lantern-seen-
+
+      - name: Ingest
+        working-directory: lantern
+        env:
+          # Inputs go through env, never straight into the script, so they can't inject shell.
+          COMPANIES: ${{ inputs.companies }}
+          FULL_RESEND: ${{ inputs.full_resend }}
+        run: |
+          args=(--config ../runner/config --out ../out --state ../state/seen.json)
+          if [ -n "$COMPANIES" ]; then args+=(--companies "$COMPANIES"); fi
+          if [ "$FULL_RESEND" = "true" ]; then args+=(--full-resend); fi
+          pnpm cli ingest "${args[@]}"
+
+      - name: Summary
+        if: ${{ !cancelled() && hashFiles('out/report.json') != '' }}
+        run: |
+          node -e '
+            const r = require("./out/report.json")
+            const t = r.totals, c = r.changes
+            const lines = [
+              `### Ingest ${r.failed ? "failed" : "finished"}`,
+              `${t.ok}/${t.companies} companies ok · ${t.fetched} fetched · ${t.kept} kept` +
+                (c ? ` · **${c.new} new**, ${c.updated} updated, ${c.unchanged} unchanged` : ""),
+              "",
+              "| Company | Status | Fetched | Kept | Error |",
+              "|---|---|---|---|---|",
+              ...r.companies.map((x) =>
+                `| ${x.slug} | ${x.status}${x.status === "ok" && !x.complete ? " (partial)" : ""} | ${x.fetched} | ${x.kept} | ${x.error ?? ""} |`),
+            ]
+            console.log(lines.join("\n"))
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        if: ${{ !cancelled() && !inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ingest-${{ github.run_id }}
+          path: |
+            out/jobs.jsonl
+            out/open.json
+            out/report.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload dry-run report
+        if: ${{ !cancelled() && inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ingest-dry-run-${{ github.run_id }}
+          path: out/report.json
+          retention-days: 7
+
+      - name: Save seen-jobs state
+        if: ${{ success() && !inputs.dry_run }}
+        uses: actions/cache/save@v6
+        with:
+          path: state
+          key: lantern-seen-${{ github.run_id }}

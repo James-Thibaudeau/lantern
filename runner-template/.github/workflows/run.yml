@@ -1,0 +1,41 @@
+name: Ingest jobs
+
+on:
+  # Daily at 11:17 UTC (6:17 a.m. EST / 7:17 a.m. EDT). Off the top of the hour,
+  # which GitHub often delays. Change the time to suit you.
+  schedule:
+    - cron: '17 11 * * *'
+  workflow_dispatch:
+    inputs:
+      companies:
+        description: 'Comma-separated company slugs to fetch (blank = all)'
+        type: string
+        required: false
+        default: ''
+      dryRun:
+        description: 'Dry run: report only, nothing for sync, state not saved'
+        type: boolean
+        default: false
+      fullResend:
+        description: 'Ignore saved state and resend every job'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never let a manual run and the scheduled run race on the seen-jobs cache.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    # When upgrading Lantern, bump BOTH the @tag and lantern_ref, in the same commit.
+    uses: James-Thibaudeau/lantern/.github/workflows/ingest.yml@v1
+    with:
+      lantern_ref: v1
+      # Scheduled runs have no inputs, so fall back to defaults.
+      companies: ${{ inputs.companies || '' }}
+      dry_run: ${{ inputs.dryRun || false }}
+      full_resend: ${{ inputs.fullResend || false }}
