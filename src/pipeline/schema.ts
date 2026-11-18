@@ -57,6 +57,8 @@ export const SourceIdSchema = z.enum([
 ])
 export type SourceId = z.infer<typeof SourceIdSchema>
 
+export const HttpUrl = z.url({ protocol: /^https?$/ })
+
 export const JobSchema = z.object({
   /** hash(source + companySlug + sourceJobId) — sourceJobId alone isn't unique for every ATS. */
   id: z.string(),
@@ -67,8 +69,10 @@ export const JobSchema = z.object({
   companySlug: z.string(),
   company: z.string(),
   title: z.string().min(1),
-  url: z.url(),
-  applyUrl: z.url().nullable(),
+  // http(s) only: these come from third-party APIs and end up in <a href>, and plain
+  // z.url() would also accept javascript: and data: URLs.
+  url: HttpUrl,
+  applyUrl: HttpUrl.nullable(),
   locationText: z.string(),
   /** 'CA', 'US', another country name, or null when unknown. */
   country: z.string().nullable(),

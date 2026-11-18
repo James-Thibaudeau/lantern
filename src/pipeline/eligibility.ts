@@ -47,8 +47,6 @@ const BARE_MODE = /^(fully |100% )?(remote|hybrid|on[- ]?site|in[- ]office)?[\s(
 
 const CA_PROVINCES =
   /\b(ontario|qu[eé]bec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|yukon|northwest territories|nunavut)\b/i
-// Province codes only count after a comma or inside parentheses ("Toronto, ON", "Remote (BC)").
-const CA_PROVINCE_CODES = /(,\s*|\()(ON|BC|AB|QC|MB|SK|NS|NB|NL|PE|PEI|YT|NT|NU)\b/
 const CA_CITIES =
   /\b(toronto|vancouver|montr[eé]al|ottawa|calgary|edmonton|waterloo|kitchener|winnipeg|halifax|mississauga|markham|burnaby|gatineau|saskatoon|regina|fredericton|moncton|guelph|oakville|laval|victoria,\s*bc)\b/i
 const CA_COUNTRY = /\bcanad(a|ian)\b/i
@@ -58,9 +56,6 @@ const US_COUNTRY_NAME = /\bunited states\b/i
 const US_COUNTRY_CODE = /\bU\.S\.(A\.)?|\bUSA?\b/ // case-sensitive so the word "us" doesn't match
 const US_STATES =
   /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i
-// "San Francisco, CA" — after a comma, CA is California, not Canada.
-const US_STATE_CODES =
-  /,\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/
 const US_CITIES =
   /\b(san francisco|new york|nyc|seattle|austin|boston|chicago|denver|los angeles|atlanta|miami|dallas|houston|portland|san diego|san jose|palo alto|mountain view|menlo park|bay area|silicon valley|philadelphia|pittsburgh|salt lake city|phoenix|minneapolis|detroit|raleigh|nashville)\b/i
 
@@ -69,6 +64,23 @@ const REGION_INCL = /\b(north america|americas|worldwide|anywhere|global(ly)?)\b
 
 const OTHER_PLACES =
   /\b(united kingdom|UK|england|scotland|london|ireland|dublin|germany|berlin|munich|france|paris|spain|madrid|barcelona|portugal|lisbon|italy|netherlands|amsterdam|luxembourg|ukraine|hungary|serbia|croatia|bulgaria|lithuania|latvia|iceland|belgium|switzerland|zurich|austria|vienna|poland|warsaw|romania|bucharest|sweden|stockholm|denmark|copenhagen|norway|finland|estonia|czech(ia| republic)?|prague|greece|turkey|israel|tel aviv|india|bangalore|bengaluru|hyderabad|pune|mumbai|delhi|singapore|japan|tokyo|south korea|korea|seoul|china|hong kong|taiwan|philippines|vietnam|indonesia|malaysia|thailand|australia|sydney|melbourne|new zealand|brazil|s[aã]o paulo|mexico|argentina|colombia|chile|peru|UAE|united arab emirates|dubai|saudi arabia|KSA|riyadh|qatar|pakistan|middle east|south africa|nigeria|kenya|egypt|europe|EMEA|APAC|LATAM|asia|EU)\b/i
+
+// Two-letter region codes, which only count after a comma or inside parentheses
+// ("Toronto, ON", "Remote (BC)", "San Francisco, CA").
+const REGION_CODE = /(?:,\s*|\()([A-Z]{2,3})(?![A-Za-z])/g
+const CA_PROVINCE_CODES = new Set('ON BC AB QC MB SK NS NB NL PE PEI YT NT NU'.split(' '))
+const US_STATE_CODES = new Set(
+  'AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(
+    ' ',
+  ),
+)
+// Province and state codes that are also ISO country codes: NL is Newfoundland or the
+// Netherlands, DE is Delaware or Germany, IN is Indiana or India, CA is California or Canada.
+const ALSO_COUNTRY_CODES = new Set(
+  'NL PE SK YT AL AR AZ CA CO DE GA ID IL IN KY LA MA MD ME MN MO MS MT NC NE PA SC SD TN VA'.split(
+    ' ',
+  ),
+)
 
 const MODE_REMOTE = /\bremote\b|\bwork from home\b|\bdistributed\b/i
 const MODE_HYBRID = /\bhybrid\b/i
@@ -98,25 +110,51 @@ function detectMode(text: string): WorkplaceType | null {
   return null
 }
 
+/** True if the text names something besides a work mode ("Remote", "Hybrid") and punctuation. */
+function hasPlaceWords(text: string): boolean {
+  const rest = text
+    .replace(MODE_REMOTE, '')
+    .replace(MODE_HYBRID, '')
+    .replace(MODE_ONSITE, '')
+    .replace(/[\s,()\-–—:/]+/g, '')
+  return rest.length > 0
+}
+
+/**
+ * Reads a trailing province/state code ("Toronto, ON"). Returns undefined when there's
+ * no such code, and null when there is one but it can't be told apart from a country code.
+ */
+function placeFromRegionCode(text: string): Place | null | undefined {
+  // The last code is usually the most specific one ("Austin, TX").
+  for (const m of [...text.matchAll(REGION_CODE)].toReversed()) {
+    const code = m[1]
+    const isCa = CA_PROVINCE_CODES.has(code)
+    if (!isCa && !US_STATE_CODES.has(code)) continue
+    if (ALSO_COUNTRY_CODES.has(code)) {
+      const before = text.slice(0, m.index)
+      const foreign = OTHER_PLACES.exec(before)
+      // "Amsterdam, NL" is the Netherlands, not Newfoundland.
+      if (foreign) return { kind: 'OTHER', name: foreign[1] }
+      // "Remote, DE": Delaware or Germany? Leave it for the LLM pass.
+      if (!hasPlaceWords(before)) return null
+    }
+    return { kind: isCa ? 'CA' : 'US' }
+  }
+  return undefined
+}
+
 function detectPlace(text: string): Place | null {
-  if (
-    CA_COUNTRY.test(text) ||
-    CA_CODE.test(text) ||
-    CA_PROVINCES.test(text) ||
-    CA_PROVINCE_CODES.test(text) ||
-    CA_CITIES.test(text)
-  ) {
-    return { kind: 'CA' }
-  }
-  if (
-    US_COUNTRY_NAME.test(text) ||
-    US_COUNTRY_CODE.test(text) ||
-    US_STATE_CODES.test(text) ||
-    US_STATES.test(text) ||
-    US_CITIES.test(text)
-  ) {
-    return { kind: 'US' }
-  }
+  // 1. Country names and codes are the strongest signal.
+  if (CA_COUNTRY.test(text) || CA_CODE.test(text)) return { kind: 'CA' }
+  if (US_COUNTRY_NAME.test(text) || US_COUNTRY_CODE.test(text)) return { kind: 'US' }
+
+  // 2. A province/state code beats a city name: "Vancouver, WA" is in Washington.
+  const fromCode = placeFromRegionCode(text)
+  if (fromCode !== undefined) return fromCode
+
+  // 3. Province, state and city names.
+  if (CA_PROVINCES.test(text) || CA_CITIES.test(text)) return { kind: 'CA' }
+  if (US_STATES.test(text) || US_CITIES.test(text)) return { kind: 'US' }
   // A named place beats a broad word: "Remote, anywhere in Europe" is about Europe.
   const other = OTHER_PLACES.exec(text)
   if (other) return { kind: 'OTHER', name: other[1] }

@@ -221,3 +221,31 @@ describe('classifyEligibility: fixes found on the first real run', () => {
     expect(classifyEligibility(gh('Remote, anywhere')).eligibility).toBe('remote_canada_ok')
   })
 })
+
+describe('classifyEligibility: two-letter region codes', () => {
+  it.each([
+    // Codes that are also country codes give way to a foreign place before them.
+    ['Amsterdam, NL', 'non_canada_onsite', 'Amsterdam'],
+    ['Berlin, DE', 'non_canada_onsite', 'Berlin'],
+    ['Bangalore, IN', 'non_canada_onsite', 'Bangalore'],
+    ['Tel Aviv, IL', 'non_canada_onsite', 'Tel Aviv'],
+    // ...but still mean the province or state after a city that isn't foreign.
+    ["St. John's, NL", 'canada_onsite', 'CA'],
+    ['Indianapolis, IN', 'non_canada_onsite', 'US'],
+    ['San Francisco, CA', 'non_canada_onsite', 'US'],
+    // A province or state code beats a city name in the other country.
+    ['Vancouver, WA', 'non_canada_onsite', 'US'],
+    ['London, ON', 'canada_onsite', 'CA'],
+    ['Toronto, ON', 'canada_onsite', 'CA'],
+    // With nothing but a work mode, an ambiguous code is left for the LLM pass.
+    ['Remote, DE', 'unknown', null],
+    ['Remote, CA', 'unknown', null],
+    // Codes that are only a province or state still decide on their own.
+    ['Remote, TX', 'remote_us_only', 'US'],
+    ['Remote (BC)', 'remote_canada_ok', 'CA'],
+  ] as const)('%s → %s', (text, eligibility, country) => {
+    const r = classifyEligibility(gh(text))
+    expect(r.eligibility).toBe(eligibility)
+    expect(r.country).toBe(country)
+  })
+})

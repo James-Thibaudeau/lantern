@@ -303,3 +303,21 @@ describe('fixtures', () => {
     expect(longest).toBeLessThanOrEqual(400)
   })
 })
+
+describe('job URLs', () => {
+  it('only accepts http and https', () => {
+    const base = expectOk(greenhouse.normalize(ghJobs[0], ghCompany))
+    expect(JobSchema.safeParse(base).success).toBe(true)
+    for (const bad of ['javascript:alert(1)', 'data:text/html,hi', 'ftp://example.com/x']) {
+      expect(JobSchema.safeParse({ ...base, url: bad }).success).toBe(false)
+      expect(JobSchema.safeParse({ ...base, applyUrl: bad }).success).toBe(false)
+    }
+  })
+
+  it('reports a posting with a javascript: link as bad instead of keeping it', () => {
+    const r = expectErr(
+      greenhouse.normalize({ ...ghJobs[0], absolute_url: 'javascript:alert(1)' }, ghCompany),
+    )
+    expect(r.error).toMatch(/url/i)
+  })
+})

@@ -98,6 +98,8 @@ jobs:
           node -e '
             const r = require("./out/report.json")
             const t = r.totals, c = r.changes
+            // Errors can span lines and contain "|", which would break the table.
+            const cell = (s) => String(s ?? "").split("\n")[0].replace(/\|/g, "\\|")
             const lines = [
               `### Ingest ${r.failed ? "failed" : "finished"}`,
               `${t.ok}/${t.companies} companies ok · ${t.fetched} fetched · ${t.kept} kept` +
@@ -106,7 +108,7 @@ jobs:
               "| Company | Status | Fetched | Kept | Error |",
               "|---|---|---|---|---|",
               ...r.companies.map((x) =>
-                `| ${x.slug} | ${x.status}${x.status === "ok" && !x.complete ? " (partial)" : ""} | ${x.fetched} | ${x.kept} | ${x.error ?? ""} |`),
+                `| ${x.slug} | ${x.status}${x.status === "ok" && !x.complete ? " (partial)" : ""} | ${x.fetched} | ${x.kept} | ${cell(x.error)} |`),
             ]
             console.log(lines.join("\n"))
           ' >> "$GITHUB_STEP_SUMMARY"
