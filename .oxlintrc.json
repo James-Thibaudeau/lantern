@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true
+  },
   "plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y"],
   "categories": {
     "correctness": "error",
@@ -15,6 +18,11 @@
     "import/no-cycle": "error",
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
     "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
@@ -26,7 +34,9 @@
       "plugins": ["vitest"],
       "rules": {
         "vitest/no-focused-tests": "error",
-        "vitest/no-disabled-tests": "warn"
+        "vitest/no-disabled-tests": "warn",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/no-unnecessary-type-parameters": "off"
       }
     }
   ],

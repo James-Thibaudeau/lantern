@@ -54,16 +54,12 @@ function workplace(
   type: string | null | undefined,
   isRemote: boolean | null | undefined,
 ): WorkplaceType | null {
-  switch (type?.toLowerCase()) {
-    case 'onsite':
-      return 'onsite'
-    case 'remote':
-      return 'remote'
-    case 'hybrid':
-      return 'hybrid'
-  }
+  const t = type?.toLowerCase()
+  if (t === 'onsite' || t === 'remote' || t === 'hybrid') return t
   return isRemote ? 'remote' : null
 }
+
+const Listing = z.looseObject({ isListed: z.boolean().nullish() })
 
 const INTERVALS: Record<string, Salary['period']> = {
   '1 YEAR': 'year',
@@ -80,7 +76,7 @@ export const ashby: SourceAdapter = {
     const c = requireCompany(company, 'ashby')
     const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(c.slug)}?includeCompensation=true`
     const res = Response.parse(await http.getJson(url))
-    const listed = res.jobs.filter((j) => (j as { isListed?: unknown }).isListed !== false)
+    const listed = res.jobs.filter((j) => Listing.safeParse(j).data?.isListed !== false)
     return { raw: listed, complete: true }
   },
 

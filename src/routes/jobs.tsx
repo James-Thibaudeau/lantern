@@ -2,7 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { z } from 'zod'
 
-import { ELIGIBILITY, type Eligibility, type Salary } from '#/pipeline/schema'
+import { ELIGIBILITY, EligibilitySchema, type Eligibility, type Salary } from '#/pipeline/schema'
 import { getJobs, type JobRow } from '#/server/jobs'
 
 // Filters live in the URL (?eligibility=…&company=…&q=…), so a filtered view can be
@@ -83,8 +83,10 @@ function JobsPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
 
-  const setSearch = (patch: Partial<JobsSearch>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true })
+  const setSearch = (patch: Partial<JobsSearch>) => {
+    // navigate() returns a promise; filter changes don't need to wait for it.
+    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true })
+  }
 
   const companies = useMemo(
     () =>
@@ -145,7 +147,7 @@ function JobsPage() {
               aria-label="Filter by location"
               value={search.eligibility ?? ''}
               onChange={(e) =>
-                setSearch({ eligibility: (e.target.value || undefined) as Eligibility | undefined })
+                setSearch({ eligibility: EligibilitySchema.safeParse(e.target.value).data })
               }
               className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             >

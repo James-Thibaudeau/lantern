@@ -2,16 +2,28 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
 
-import type { IngestReport } from '#/pipeline/ingest'
-import type { Job } from '#/pipeline/schema'
+import { JobSchema, type Job } from '#/pipeline/schema'
 
 /** What the jobs page needs per job: everything except the heavy HTML description. */
 export type JobRow = Omit<Job, 'descriptionHtml'>
 
+// Just the parts of report.json this page shows.
+const RunSummary = z.object({
+  runId: z.string(),
+  finishedAt: z.string(),
+  totals: z.object({
+    ok: z.number(),
+    companies: z.number(),
+    fetched: z.number(),
+    kept: z.number(),
+  }),
+})
+
 export interface JobsData {
   jobs: JobRow[]
-  run: Pick<IngestReport, 'runId' | 'finishedAt' | 'totals'> | null
+  run: z.infer<typeof RunSummary> | null
   /** Set when there's no ingest output to show yet. */
   missing: string | null
 }
@@ -37,15 +49,16 @@ export const getJobs = createServerFn({ method: 'GET' }).handler(async (): Promi
     .split('\n')
     .filter((line) => line.trim())
     .map((line) => {
-      const { descriptionHtml: _html, ...row } = JSON.parse(line) as Job
+      // Validating costs little and catches output written by an older pipeline version.
+      const { descriptionHtml: _html, ...row } = JobSchema.parse(JSON.parse(line))
       return row
     })
     .toSorted((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''))
 
   let run: JobsData['run'] = null
   try {
-    const report = JSON.parse(await readFile(join(OUT_DIR, 'report.json'), 'utf8')) as IngestReport
-    run = { runId: report.runId, finishedAt: report.finishedAt, totals: report.totals }
+    const report = JSON.parse(await readFile(join(OUT_DIR, 'report.json'), 'utf8'))
+    run = RunSummary.safeParse(report).data ?? null
   } catch {
     // The report is optional for this page.
   }

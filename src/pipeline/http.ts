@@ -39,9 +39,14 @@ export function createHttpClient(opts: HttpOptions = {}): HttpClient {
     let lastErr: unknown
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
+        // init.headers may be a plain object, an array of pairs or a Headers instance;
+        // Headers handles all three (spreading it into an object would not).
+        const headers = new Headers(init.headers)
+        if (!headers.has('User-Agent')) headers.set('User-Agent', USER_AGENT)
+        if (!headers.has('Accept')) headers.set('Accept', 'application/json')
         const res = await fetchImpl(url, {
           ...init,
-          headers: { 'User-Agent': USER_AGENT, Accept: 'application/json', ...init.headers },
+          headers,
           signal: AbortSignal.timeout(timeoutMs),
         })
         if (!res.ok) throw new HttpError(res.status, url)

@@ -68,6 +68,8 @@ export function buildJob(d: JobDraft): NormalizeResult {
   return { ok: true, job: parsed.data }
 }
 
+const RawId = z.looseObject({ id: z.union([z.string(), z.number()]) })
+
 /** Parse a raw posting with a lenient schema, turning failures into a NormalizeResult. */
 export function parseRaw<T>(
   schema: z.ZodType<T>,
@@ -75,10 +77,10 @@ export function parseRaw<T>(
 ): { ok: true; data: T } | { ok: false; error: string; sourceJobId?: string } {
   const parsed = schema.safeParse(raw)
   if (parsed.success) return { ok: true, data: parsed.data }
-  const id = (raw as { id?: unknown } | null)?.id
+  const id = RawId.safeParse(raw).data?.id
   return {
     ok: false,
-    sourceJobId: typeof id === 'string' || typeof id === 'number' ? String(id) : undefined,
+    sourceJobId: id === undefined ? undefined : String(id),
     error: z.prettifyError(parsed.error),
   }
 }

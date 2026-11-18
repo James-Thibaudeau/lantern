@@ -2,7 +2,7 @@ import { adapters, type FetchContext } from './adapters'
 import type { IngestConfig } from './config'
 import { createFilter, type FilterResult } from './filter'
 import { mapLimit, sleep, type HttpClient } from './http'
-import { ELIGIBILITY, type Company, type Eligibility, type Job } from './schema'
+import type { Company, Eligibility, Job } from './schema'
 
 export interface IngestOptions {
   config: IngestConfig
@@ -83,8 +83,16 @@ export interface IngestResult {
   outcomes: JobOutcome[]
 }
 
-const emptyEligibility = () =>
-  Object.fromEntries(ELIGIBILITY.map((e) => [e, 0])) as Record<Eligibility, number>
+// Spelled out so adding an eligibility value is a type error here until it's counted.
+const emptyEligibility = (): Record<Eligibility, number> => ({
+  canada_onsite: 0,
+  canada_hybrid: 0,
+  remote_canada_ok: 0,
+  remote_us_only: 0,
+  remote_non_canada: 0,
+  non_canada_onsite: 0,
+  unknown: 0,
+})
 
 export async function runIngest(opts: IngestOptions): Promise<IngestResult> {
   const now = opts.now ?? (() => new Date())
