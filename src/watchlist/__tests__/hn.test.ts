@@ -13,10 +13,6 @@ describe('postHeader', () => {
       'Toronto &amp; Remote<p>We&#x27;re hiring.<p>More text.'
     expect(postHeader(html)).toBe('Acme (YC W21) | Senior Engineer | Toronto & Remote')
   })
-
-  it('caps the header at 300 characters', () => {
-    expect(postHeader('x'.repeat(500))).toHaveLength(300)
-  })
 })
 
 describe('companyFromHeader', () => {

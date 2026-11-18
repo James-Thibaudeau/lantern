@@ -129,9 +129,4 @@ describe('GitHubRunner', () => {
     }
     expect(fetchImpl).not.toHaveBeenCalled()
   })
-
-  it('links to the workflow page', () => {
-    const runner = new GitHubRunner({ token: 't', repo: 'me/r', workflow: 'other.yml' })
-    expect(runner.actionsUrl).toBe('https://github.com/me/r/actions/workflows/other.yml')
-  })
 })

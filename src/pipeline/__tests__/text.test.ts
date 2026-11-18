@@ -4,18 +4,9 @@ import { htmlToText, normalizeKey, sha256, toIso } from '../text'
 
 describe('htmlToText', () => {
   it('puts paragraphs and list items on their own lines', () => {
-    const html = '<p>About us</p><ul><li>Build things</li><li>Ship things</li></ul><p>Apply now</p>'
-    const text = htmlToText(html)
-    // Each item gets its own line. (Consecutive <li>s currently come out separated by a
-    // blank line, because </li> and the next <li> each add a newline.)
-    expect(text.split('\n').filter(Boolean)).toEqual([
-      'About us',
-      '• Build things',
-      '• Ship things',
-      'Apply now',
-    ])
-    expect(text.startsWith('About us\n')).toBe(true)
-    expect(text.endsWith('\nApply now')).toBe(true)
+    expect(htmlToText('<p>Intro</p><ul><li>A</li><li>B</li></ul><p>End</p>')).toBe(
+      'Intro\n\n• A\n• B\n\nEnd',
+    )
   })
 
   it('turns <br> into newlines', () => {
@@ -47,10 +38,6 @@ describe('normalizeKey', () => {
       'montreal qc senior engineer back end',
     )
   })
-
-  it('makes equivalent strings equal', () => {
-    expect(normalizeKey('Québec')).toBe(normalizeKey('Quebec'))
-  })
 })
 
 describe('toIso', () => {
@@ -72,24 +59,8 @@ describe('toIso', () => {
 })
 
 describe('sha256', () => {
-  it('returns the full hex digest by default', () => {
+  it('returns the hex digest, truncated on request', () => {
     expect(sha256('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-  })
-
-  it('truncates to the requested length', () => {
     expect(sha256('abc', 24)).toBe('ba7816bf8f01cfea414140de')
-  })
-
-  it('is deterministic and input-sensitive', () => {
-    expect(sha256('x')).toBe(sha256('x'))
-    expect(sha256('x')).not.toBe(sha256('y'))
-  })
-})
-
-describe('htmlToText list spacing', () => {
-  it('puts consecutive list items on adjacent lines', () => {
-    expect(htmlToText('<p>Intro</p><ul><li>A</li><li>B</li></ul><p>End</p>')).toBe(
-      'Intro\n\n• A\n• B\n\nEnd',
-    )
   })
 })

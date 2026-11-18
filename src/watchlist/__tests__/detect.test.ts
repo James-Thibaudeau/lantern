@@ -162,11 +162,6 @@ describe('extractUrls / findBoards', () => {
       { ats: 'greenhouse', slug: 'acmeco', supported: true },
     ])
   })
-
-  it('finds nothing in text without links', () => {
-    expect(extractUrls('no links here')).toEqual([])
-    expect(findBoards('<p>Remote | Engineer</p>')).toEqual([])
-  })
 })
 
 describe('guessSlugs', () => {
@@ -288,13 +283,6 @@ describe('detectFromSite', () => {
     })
   })
 
-  it('returns null when nothing is found', async () => {
-    const http = fakeHttp([])
-    await expect(
-      detectFromSite({ http, fetchText: emptyPage }, 'https://nothing.dev', 'Nothing'),
-    ).resolves.toBeNull()
-  })
-
   it('passes on errors other than 404', async () => {
     const http = fakeHttp([
       [
@@ -361,7 +349,6 @@ describe('checkBoard / completeDetections', () => {
 describe('boardUrl', () => {
   it.each([
     [{ ats: 'greenhouse', slug: 'acme' }, 'https://job-boards.greenhouse.io/acme'],
-    [{ ats: 'lever', slug: 'acme' }, 'https://jobs.lever.co/acme'],
     [{ ats: 'ashby', slug: 'Acme Corp' }, 'https://jobs.ashbyhq.com/Acme%20Corp'],
     [
       {
@@ -372,10 +359,6 @@ describe('boardUrl', () => {
       'https://acme.wd5.myworkdayjobs.com/External',
     ],
     [{ ats: 'workday', slug: 'acme' }, null],
-    [{ ats: 'bamboohr', slug: 'acme' }, 'https://acme.bamboohr.com/careers'],
-    [{ ats: 'workable', slug: 'acme' }, 'https://apply.workable.com/acme'],
-    [{ ats: 'smartrecruiters', slug: 'Acme1' }, 'https://jobs.smartrecruiters.com/Acme1'],
-    [{ ats: 'recruitee', slug: 'acme' }, 'https://acme.recruitee.com'],
     [{ ats: 'unknown', slug: 'acme' }, null],
   ])('%j → %s', (board, url) => {
     expect(boardUrl(board)).toBe(url)

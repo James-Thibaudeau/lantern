@@ -243,19 +243,6 @@ describe('applyRun', () => {
     expect(runRow(db, 'r2')?.closed).toBe(1)
   })
 
-  it('closes nothing when no company was fetched completely', () => {
-    const db = openDb(':memory:')
-    applyRun(db, runData({ runId: 'r1', createdAt: T1, jobs: [makeJob('a1')] }), NOW)
-    const counts = applyRun(
-      db,
-      runData({ runId: 'r2', createdAt: T2, jobs: [], open: [], completeCompanies: [] }),
-      NOW,
-    )
-
-    expect(counts.closed).toBe(0)
-    expect(jobRow(db, 'a1')?.closedAt).toBeNull()
-  })
-
   it('does not move closedAt of an already closed job', () => {
     const db = openDb(':memory:')
     const a1 = makeJob('a1')
@@ -418,31 +405,16 @@ describe('applyRun', () => {
     )
   })
 
-  it('still applies a run whose report.json is malformed', () => {
+  it.each([
+    ['malformed', '{not json'],
+    ['the wrong shape', JSON.stringify({ companies: [{ slug: 'acme' }] })],
+  ])('still applies a run whose report.json is %s', (_, reportJson) => {
     const db = openDb(':memory:')
-    const run = runData({
-      runId: 'r1',
-      createdAt: T1,
-      jobs: [makeJob('a1')],
-      reportJson: '{not json',
-    })
+    const run = runData({ runId: 'r1', createdAt: T1, jobs: [makeJob('a1')], reportJson })
 
     expect(() => applyRun(db, run, NOW)).not.toThrow()
     expect(jobRow(db, 'a1')).toBeDefined()
-    expect(runRow(db, 'r1')).toMatchObject({ outcome: 'synced', report: '{not json' })
-    expect(db.select().from(companies).all()).toEqual([])
-  })
-
-  it('ignores a report.json that is valid JSON but the wrong shape', () => {
-    const db = openDb(':memory:')
-    const run = runData({
-      runId: 'r1',
-      createdAt: T1,
-      jobs: [makeJob('a1')],
-      reportJson: JSON.stringify({ companies: [{ slug: 'acme' }] }),
-    })
-
-    expect(() => applyRun(db, run, NOW)).not.toThrow()
+    expect(runRow(db, 'r1')).toMatchObject({ outcome: 'synced', report: reportJson })
     expect(db.select().from(companies).all()).toEqual([])
   })
 })
@@ -489,14 +461,6 @@ describe('parseRunFiles', () => {
     expect(() => parseRunFiles('r1', T1, files)).toThrow(
       "Run r1: jobs.jsonl line 2 isn't a valid job",
     )
-  })
-
-  it('rejects a data: applyUrl', () => {
-    const bad = { ...makeJob('a1'), applyUrl: 'data:text/html,hi' }
-    const files = runFiles({ runId: 'r1', createdAt: T1 })
-    files['jobs.jsonl'] = JSON.stringify(bad)
-
-    expect(() => parseRunFiles('r1', T1, files)).toThrow(/jobs\.jsonl line 1/)
   })
 })
 

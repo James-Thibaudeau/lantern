@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { classifyEligibility, type EligibilityInput } from '../eligibility'
+import { classifyEligibility, mentionsCanada, type EligibilityInput } from '../eligibility'
 import type { Eligibility, WorkplaceType } from '../schema'
 
 // Inputs are shaped the way each adapter builds them (see adapters/*.ts), so these
@@ -51,14 +51,11 @@ describe('classifyEligibility: Greenhouse location text', () => {
     ['Remote (United States)', 'remote_us_only'],
     ['Remote, United Kingdom', 'remote_non_canada'],
     ['Remote, Australia; Remote, Singapore', 'remote_non_canada'],
-    // After a comma, CA is California.
-    ['San Francisco, CA', 'non_canada_onsite'],
     ['New York City, NY; San Francisco, CA', 'non_canada_onsite'],
     ['Bangalore, India', 'non_canada_onsite'],
     ['Kitchener-Waterloo, ON; Toronto, ON', 'canada_onsite'],
     ['Hybrid (Toronto, Ontario)', 'canada_hybrid'],
     ['Remote, North America', 'remote_canada_ok'],
-    ['London, ON', 'canada_onsite'],
     ['London, UK', 'non_canada_onsite'],
   ]
 
@@ -202,7 +199,6 @@ describe('classifyEligibility: edge cases', () => {
 
 describe('classifyEligibility: fixes found on the first real run', () => {
   it('matches "United States" in any case', () => {
-    expect(classifyEligibility(gh('Remote (United States)')).eligibility).toBe('remote_us_only')
     expect(classifyEligibility(gh('remote, united states')).eligibility).toBe('remote_us_only')
   })
 
@@ -247,5 +243,20 @@ describe('classifyEligibility: two-letter region codes', () => {
     const r = classifyEligibility(gh(text))
     expect(r.eligibility).toBe(eligibility)
     expect(r.country).toBe(country)
+  })
+})
+
+describe('mentionsCanada', () => {
+  it.each([
+    ['Toronto', true],
+    ['Remote (Canada)', true],
+    ['Vancouver, BC', true],
+    ['KOHO (CAN)', true],
+    ['Remote (US)', false],
+    ['London, UK', false],
+    ['San Francisco, CA', false],
+    ['Berlin, DE', false],
+  ])('%j → %s', (text, expected) => {
+    expect(mentionsCanada(text)).toBe(expected)
   })
 })

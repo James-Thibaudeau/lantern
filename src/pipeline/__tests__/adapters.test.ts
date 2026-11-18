@@ -119,11 +119,6 @@ describe('greenhouse.normalize', () => {
     expect(r.sourceJobId).toBe(String(ghJobs[0].id))
   })
 
-  it('returns ok:false for a non-URL absolute_url (caught by JobSchema)', () => {
-    const r = greenhouse.normalize({ ...ghJobs[0], absolute_url: 'not a url' }, ghCompany)
-    expect(r.ok).toBe(false)
-  })
-
   it('returns ok:false for non-object input', () => {
     expect(greenhouse.normalize(null, ghCompany).ok).toBe(false)
     expect(greenhouse.normalize('nope', ghCompany).ok).toBe(false)

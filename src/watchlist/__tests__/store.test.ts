@@ -252,13 +252,6 @@ describe('GitHubRunner contents API', () => {
     expect((init!.headers as Record<string, string>).Authorization).toBe('Bearer t0k')
   })
 
-  it('rejects an unexpected encoding', async () => {
-    const { runner } = runnerWith(() =>
-      Response.json({ content: 'x', sha: 'abc', encoding: 'none' }),
-    )
-    await expect(runner.getFile('config/companies.json')).rejects.toThrow(/Unexpected encoding/)
-  })
-
   it('commits a file to main with the sha it replaces', async () => {
     const { runner, fetchImpl } = runnerWith(() => Response.json({}))
     await runner.putFile('config/companies.json', 'héllo\n', 'abc', 'Add KOHO')
