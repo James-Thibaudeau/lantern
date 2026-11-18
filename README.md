@@ -8,15 +8,30 @@ It reads the public job-board APIs that companies already publish (Greenhouse, L
 
 ## How it works
 
-```
- company job boards ──► GitHub Action (daily, your private runner repo)
- (Greenhouse, Lever,       fetch ► normalize ► location rules ► title filter ► diff vs. last run
-  Ashby)                                                │
-                                                        ▼
-                                  artifact: jobs.jsonl · open.json · report.json
-                                                        │
-                                                        ▼
-                         local sync ► SQLite ► app (TanStack Start): /jobs, /runs
+```mermaid
+flowchart LR
+  boards["Company job boards<br/>Greenhouse · Lever · Ashby"]
+
+  subgraph runner["Private runner repo (daily Action)"]
+    config["config/<br/>companies.json<br/>profiles.json"]
+    ingest["ingest.yml@v1<br/>fetch → normalize →<br/>location rules → title filter →<br/>diff vs. last run"]
+    state[("Seen-jobs state<br/>Actions cache")]
+    artifact[/"Artifact<br/>jobs.jsonl · open.json<br/>report.json"/]
+  end
+
+  subgraph laptop["Your laptop"]
+    sync["pnpm sync"]
+    db[("SQLite<br/>data/lantern.db")]
+    app["App · TanStack Start<br/>/jobs · /runs"]
+  end
+
+  boards -->|public JSON APIs| ingest
+  config --> ingest
+  state <-->|restore / save| ingest
+  ingest --> artifact
+  artifact -->|GitHub API| sync
+  sync --> db --> app
+  app -.->|Run now · Full resend| ingest
 ```
 
 - **One adapter per source.** Each turns a board's raw postings into one shared, Zod-validated `Job` shape. A bad posting is reported and skipped; it never fails the company, and one failing company never fails the run.
