@@ -1,18 +1,31 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import { createServerFn } from '@tanstack/react-start'
+import { desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { JobSchema, type Job } from '#/pipeline/schema'
+import { ingestRuns, jobs, type JobRowDb } from '#/db/schema'
+import { EligibilitySchema, SalarySchema, type Eligibility, type Salary } from '#/pipeline/schema'
 
-/** What the jobs page needs per job: everything except the heavy HTML description. */
-export type JobRow = Omit<Job, 'descriptionHtml'>
+import { getDb, runSync, startupSync, type SyncStatus } from './db'
 
-// Just the parts of report.json this page shows.
-const RunSummary = z.object({
-  runId: z.string(),
-  finishedAt: z.string(),
+/** What the jobs page needs per job (everything except the heavy HTML description). */
+export interface JobRow {
+  id: string
+  source: string
+  company: string
+  companySlug: string
+  title: string
+  url: string
+  applyUrl: string | null
+  locationText: string
+  eligibility: Eligibility
+  salary: Salary | null
+  descriptionText: string
+  postedAt: string | null
+  firstSeenAt: string
+  closedAt: string | null
+}
+
+const RunTotals = z.object({
   totals: z.object({
     ok: z.number(),
     companies: z.number(),
@@ -23,45 +36,76 @@ const RunSummary = z.object({
 
 export interface JobsData {
   jobs: JobRow[]
-  run: z.infer<typeof RunSummary> | null
-  /** Set when there's no ingest output to show yet. */
-  missing: string | null
+  lastRun: { runId: string; at: string; totals: z.infer<typeof RunTotals>['totals'] | null } | null
+  /** Result of the sync that runs when the app starts (or the latest Sync click). */
+  sync: SyncStatus
 }
 
-// Until local sync into SQLite exists (build step 7), the page reads the last
-// `pnpm cli ingest` output straight from disk.
-const OUT_DIR = process.env.LANTERN_OUT_DIR ?? 'out'
+function toRow(j: JobRowDb): JobRow {
+  const salary = SalarySchema.safeParse({
+    min: j.salaryMin,
+    max: j.salaryMax,
+    currency: j.salaryCurrency,
+    period: j.salaryPeriod,
+  }).data
+  return {
+    id: j.id,
+    source: j.source,
+    company: j.company,
+    companySlug: j.companySlug,
+    title: j.title,
+    url: j.url,
+    applyUrl: j.applyUrl,
+    locationText: j.locationText,
+    eligibility: EligibilitySchema.catch('unknown').parse(j.eligibility),
+    salary: salary && (salary.min !== null || salary.max !== null) ? salary : null,
+    descriptionText: j.descriptionText,
+    postedAt: j.postedAt,
+    firstSeenAt: j.firstSeenAt,
+    closedAt: j.closedAt,
+  }
+}
 
 /**
- * A server function: this handler only ever runs on the server (so it can use node:fs),
- * and TanStack Start turns calls to it from the browser into an HTTP request.
+ * A server function: the handler only runs on the server (so it can use SQLite), and
+ * TanStack Start turns calls from the browser into an HTTP request.
  */
-export const getJobs = createServerFn({ method: 'GET' }).handler(async (): Promise<JobsData> => {
-  const jobsPath = join(OUT_DIR, 'jobs.jsonl')
-  let jsonl: string
-  try {
-    jsonl = await readFile(jobsPath, 'utf8')
-  } catch {
-    return { jobs: [], run: null, missing: jobsPath }
-  }
+export const getJobs = createServerFn({ method: 'GET' })
+  .validator((input: unknown) => z.object({ closed: z.boolean() }).parse(input))
+  .handler(async ({ data }): Promise<JobsData> => {
+    // The first page load after the app starts waits for a sync, so it shows fresh data.
+    const status = await startupSync()
+    const db = getDb()
 
-  const jobs = jsonl
-    .split('\n')
-    .filter((line) => line.trim())
-    .map((line) => {
-      // Validating costs little and catches output written by an older pipeline version.
-      const { descriptionHtml: _html, ...row } = JobSchema.parse(JSON.parse(line))
-      return row
-    })
-    .toSorted((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''))
+    const rows = db
+      .select()
+      .from(jobs)
+      .where(data.closed ? undefined : isNull(jobs.closedAt))
+      .orderBy(desc(jobs.firstSeenAt), desc(jobs.postedAt))
+      .all()
 
-  let run: JobsData['run'] = null
-  try {
-    const report = JSON.parse(await readFile(join(OUT_DIR, 'report.json'), 'utf8'))
-    run = RunSummary.safeParse(report).data ?? null
-  } catch {
-    // The report is optional for this page.
-  }
+    const latest = db
+      .select({ runId: ingestRuns.runId, at: ingestRuns.runCreatedAt, report: ingestRuns.report })
+      .from(ingestRuns)
+      .where(eq(ingestRuns.outcome, 'synced'))
+      .orderBy(desc(ingestRuns.runCreatedAt))
+      .limit(1)
+      .get()
+    let totals = null
+    try {
+      totals = latest?.report
+        ? (RunTotals.safeParse(JSON.parse(latest.report)).data?.totals ?? null)
+        : null
+    } catch {
+      totals = null
+    }
 
-  return { jobs, run, missing: null }
-})
+    return {
+      jobs: rows.map(toRow),
+      lastRun: latest ? { runId: latest.runId, at: latest.at, totals } : null,
+      sync: status,
+    }
+  })
+
+/** The Sync button. */
+export const syncNow = createServerFn({ method: 'POST' }).handler(() => runSync())

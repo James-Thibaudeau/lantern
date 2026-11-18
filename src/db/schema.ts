@@ -1,0 +1,91 @@
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+
+/**
+ * Jobs synced from ingest runs.
+ *
+ * Column ownership: sync owns the source fields plus firstSeenAt, lastSeenAt, closedAt and
+ * lastRunId. `status` and `notes` are local-only; sync never touches them.
+ * Timestamps are ISO 8601 strings.
+ */
+export const jobs = sqliteTable(
+  'jobs',
+  {
+    id: text('id').primaryKey(),
+    dedupeKey: text('dedupe_key').notNull(),
+    source: text('source').notNull(),
+    sourceJobId: text('source_job_id').notNull(),
+    companySlug: text('company_slug').notNull(),
+    company: text('company').notNull(),
+    title: text('title').notNull(),
+    url: text('url').notNull(),
+    applyUrl: text('apply_url'),
+    locationText: text('location_text').notNull(),
+    country: text('country'),
+    workplaceType: text('workplace_type'),
+    eligibility: text('eligibility').notNull(),
+    salaryMin: real('salary_min'),
+    salaryMax: real('salary_max'),
+    salaryCurrency: text('salary_currency'),
+    salaryPeriod: text('salary_period'),
+    descriptionHtml: text('description_html').notNull(),
+    descriptionText: text('description_text').notNull(),
+    postedAt: text('posted_at'),
+    updatedAt: text('updated_at'),
+    contentHash: text('content_hash').notNull(),
+
+    // Set by sync.
+    firstSeenAt: text('first_seen_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    /** Set when a complete fetch of the company no longer lists the job; cleared if it comes back. */
+    closedAt: text('closed_at'),
+    lastRunId: text('last_run_id').notNull(),
+
+    // Local only.
+    status: text('status').notNull().default('new'),
+    notes: text('notes'),
+  },
+  (t) => [
+    index('jobs_company_open_idx').on(t.companySlug, t.closedAt),
+    index('jobs_dedupe_idx').on(t.dedupeKey),
+  ],
+)
+
+/** One row per runner workflow run that sync has looked at. */
+export const ingestRuns = sqliteTable('ingest_runs', {
+  runId: text('run_id').primaryKey(),
+  runCreatedAt: text('run_created_at').notNull(),
+  syncedAt: text('synced_at').notNull(),
+  /**
+   * synced: applied. no_artifact: a dry run or other run without results.
+   * expired: results were deleted before sync got to them (a gap).
+   * superseded: older than a run already synced, so applying it would undo newer data.
+   */
+  outcome: text('outcome', { enum: ['synced', 'no_artifact', 'expired', 'superseded'] }).notNull(),
+  received: integer('received').notNull().default(0),
+  inserted: integer('inserted').notNull().default(0),
+  updated: integer('updated').notNull().default(0),
+  closed: integer('closed').notNull().default(0),
+  reopened: integer('reopened').notNull().default(0),
+  /** Open jobs listed by the run that aren't in the local DB: a sign of a missed run. */
+  missing: integer('missing').notNull().default(0),
+  /** report.json from the run, as JSON text. */
+  report: text('report'),
+})
+
+/** Latest known state of each watched company, from run reports. */
+export const companies = sqliteTable('companies', {
+  slug: text('slug').primaryKey(),
+  name: text('name').notNull(),
+  ats: text('ats').notNull(),
+  lastRunId: text('last_run_id').notNull(),
+  lastRunAt: text('last_run_at').notNull(),
+  lastStatus: text('last_status').notNull(),
+  lastComplete: integer('last_complete', { mode: 'boolean' }).notNull(),
+  lastFetched: integer('last_fetched').notNull(),
+  lastKept: integer('last_kept').notNull(),
+  lastError: text('last_error'),
+})
+
+export type JobRowDb = typeof jobs.$inferSelect
+export type IngestRunRow = typeof ingestRuns.$inferSelect
+export type CompanyRow = typeof companies.$inferSelect

@@ -11,6 +11,12 @@ import { applyState, readState, writeState, type SeenState } from './state'
 const USAGE = `Usage:
   pnpm cli ingest [options]
   pnpm cli init-runner <repo-name> [--dir <path>] [--local-only]
+  pnpm cli sync [--from <dir>] [--db <file>]      (also: pnpm sync)
+  pnpm cli run [--full-resend] [--dry-run] [--companies <a,b>]
+
+sync pulls new runner results from GitHub into SQLite (data/lantern.db). It needs
+LANTERN_RUNNER_REPO in .env, and LANTERN_GITHUB_TOKEN or a gh CLI login. --from applies
+a local \`ingest --out <dir>\` result instead. run starts the runner workflow now.
 
 init-runner creates your private runner repo from runner-template/ (default folder:
 ../<repo-name>) and pushes it to GitHub with the gh CLI. --local-only skips GitHub.
@@ -188,6 +194,10 @@ async function main() {
   switch (command) {
     case 'ingest':
       return ingest(rest)
+    case 'sync':
+      return (await import('#/sync/commands')).syncCommand(rest)
+    case 'run':
+      return (await import('#/sync/commands')).runCommand(rest)
     case 'init-runner':
       return initRunnerCommand(rest)
     case undefined:

@@ -1,6 +1,6 @@
 # Lantern runner
 
-Private runner for [Lantern](https://github.com/James-Thibaudeau/lantern). It holds your watchlist and job-search profiles, and a workflow that calls Lantern's reusable `ingest.yml` once a day. Fetched jobs land as workflow artifacts (`ingest-<run id>`), which the local Lantern app downloads. Local sync is coming in a later Lantern release; until then, `gh run download` gets them.
+Private runner for [Lantern](https://github.com/James-Thibaudeau/lantern). It holds your watchlist and job-search profiles, and a workflow that calls Lantern's reusable `ingest.yml` once a day. Fetched jobs land as workflow artifacts (`ingest-<run id>`), which the local Lantern app pulls in with `pnpm sync` (or its Sync button).
 
 Keep this repo **private**: your config, logs and artifacts then stay private without any secrets or masking.
 
