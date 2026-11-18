@@ -66,3 +66,7 @@ src/server/           server functions
 runner-template/      what `init-runner` copies into your private runner repo
 .github/workflows/    ci.yml, and ingest.yml (the reusable workflow runners call)
 ```
+
+## License
+
+[MIT](LICENSE)

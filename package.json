@@ -1,6 +1,7 @@
 {
   "name": "lantern",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "imports": {
     "#/*": "./src/*"
