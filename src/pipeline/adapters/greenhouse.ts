@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import { decodeHTML, toIso } from '../text'
+
 import type { LocationInput } from '../eligibility'
+import { decodeHTML, toIso } from '../text'
 import { buildJob, parseRaw, requireCompany } from './build-job'
 import type { SourceAdapter } from './types'
 
@@ -14,7 +15,9 @@ const RawJob = z.looseObject({
   content: z.string().nullish(),
   updated_at: z.string().nullish(),
   first_published: z.string().nullish(),
-  offices: z.array(z.looseObject({ name: z.string().nullish(), location: z.string().nullish() })).nullish(),
+  offices: z
+    .array(z.looseObject({ name: z.string().nullish(), location: z.string().nullish() }))
+    .nullish(),
 })
 
 const Response = z.looseObject({ jobs: z.array(z.unknown()) })

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util'
+
 import { loadConfig } from './config'
 import { createHttpClient } from './http'
 import { runIngest, type IngestResult } from './ingest'
@@ -38,7 +39,8 @@ function printSummary(result: IngestResult) {
   console.table(rows)
   for (const c of report.companies) {
     if (c.error) console.error(`  ${c.slug}: ${c.error}`)
-    for (const s of c.normalizeErrorSamples) console.error(`  ${c.slug} posting ${s.sourceJobId ?? '?'}: ${s.error.split('\n')[0]}`)
+    for (const s of c.normalizeErrorSamples)
+      console.error(`  ${c.slug} posting ${s.sourceJobId ?? '?'}: ${s.error.split('\n')[0]}`)
   }
   const t = report.totals
   console.log(
@@ -60,7 +62,9 @@ function printJobs(result: IngestResult, all: boolean, json: boolean) {
       console.log(JSON.stringify(job))
       continue
     }
-    const mark = filter.keep ? 'keep' : `drop:${filter.reason === 'eligibility' ? 'location' : 'title'}`
+    const mark = filter.keep
+      ? 'keep'
+      : `drop:${filter.reason === 'eligibility' ? 'location' : 'title'}`
     console.log(
       `${mark.padEnd(13)} ${job.eligibility.padEnd(18)} ${job.company} | ${job.title} | ${job.locationText || '(no location)'}`,
     )

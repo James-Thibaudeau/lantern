@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
 import { z } from 'zod'
+
 import { CompanySchema, ProfileSchema, type Company, type Profile } from './schema'
 
 export interface IngestConfig {
@@ -13,7 +15,7 @@ async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   try {
     raw = JSON.parse(await readFile(path, 'utf8'))
   } catch (err) {
-    throw new Error(`Could not read ${path}: ${(err as Error).message}`)
+    throw new Error(`Could not read ${path}: ${(err as Error).message}`, { cause: err })
   }
   const parsed = schema.safeParse(raw)
   if (!parsed.success) {

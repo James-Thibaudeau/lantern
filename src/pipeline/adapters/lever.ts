@@ -1,5 +1,6 @@
 import { escapeText } from 'entities'
 import { z } from 'zod'
+
 import type { LocationInput } from '../eligibility'
 import type { Salary, WorkplaceType } from '../schema'
 import { toIso } from '../text'
@@ -77,7 +78,12 @@ export const lever: SourceAdapter = {
     const s = j.salaryRange
     const salary: Salary | null =
       s && (s.min != null || s.max != null)
-        ? { min: s.min ?? null, max: s.max ?? null, currency: s.currency ?? null, period: INTERVALS[s.interval ?? ''] ?? null }
+        ? {
+            min: s.min ?? null,
+            max: s.max ?? null,
+            currency: s.currency ?? null,
+            period: INTERVALS[s.interval ?? ''] ?? null,
+          }
         : null
 
     return buildJob({

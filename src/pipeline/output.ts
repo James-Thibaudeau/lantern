@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
 import type { IngestResult } from './ingest'
 
 export interface WrittenFiles {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { createFilter } from '../filter'
 import type { Eligibility, Profile } from '../schema'
 
@@ -10,13 +11,19 @@ const frontend: Profile = {
   allowedEligibility: ['canada_onsite', 'canada_hybrid', 'remote_canada_ok'],
 }
 
-const job = (title: string, eligibility: Eligibility = 'remote_canada_ok') => ({ title, eligibility })
+const job = (title: string, eligibility: Eligibility = 'remote_canada_ok') => ({
+  title,
+  eligibility,
+})
 
 describe('createFilter', () => {
   const filter = createFilter([frontend])
 
   it('keeps a matching title with an allowed eligibility', () => {
-    expect(filter(job('Senior Frontend Engineer'))).toEqual({ keep: true, profileIds: ['frontend'] })
+    expect(filter(job('Senior Frontend Engineer'))).toEqual({
+      keep: true,
+      profileIds: ['frontend'],
+    })
   })
 
   it('matches include phrases case-insensitively', () => {
@@ -24,7 +31,10 @@ describe('createFilter', () => {
   })
 
   it('matches whole words only: "intern" does not exclude "International"', () => {
-    expect(filter(job('International Payments Engineer'))).toEqual({ keep: true, profileIds: ['frontend'] })
+    expect(filter(job('International Payments Engineer'))).toEqual({
+      keep: true,
+      profileIds: ['frontend'],
+    })
   })
 
   it('still excludes the whole word "intern"', () => {
@@ -48,7 +58,10 @@ describe('createFilter', () => {
   })
 
   it('rejects with reason "eligibility" when the title matches but eligibility is not allowed', () => {
-    expect(filter(job('Senior Frontend Engineer', 'remote_us_only'))).toEqual({ keep: false, reason: 'eligibility' })
+    expect(filter(job('Senior Frontend Engineer', 'remote_us_only'))).toEqual({
+      keep: false,
+      reason: 'eligibility',
+    })
   })
 
   it('rejects with reason "title" when no include phrase matches', () => {
@@ -56,9 +69,17 @@ describe('createFilter', () => {
   })
 
   it('ignores disabled profiles', () => {
-    const disabled: Profile = { ...frontend, id: 'off', enabled: false, allowedEligibility: ['remote_us_only'] }
+    const disabled: Profile = {
+      ...frontend,
+      id: 'off',
+      enabled: false,
+      allowedEligibility: ['remote_us_only'],
+    }
     const f = createFilter([frontend, disabled])
-    expect(f(job('Senior Frontend Engineer', 'remote_us_only'))).toEqual({ keep: false, reason: 'eligibility' })
+    expect(f(job('Senior Frontend Engineer', 'remote_us_only'))).toEqual({
+      keep: false,
+      reason: 'eligibility',
+    })
     expect(createFilter([disabled])(job('Senior Frontend Engineer', 'remote_us_only'))).toEqual({
       keep: false,
       reason: 'title',
@@ -74,8 +95,14 @@ describe('createFilter', () => {
       allowedEligibility: ['remote_canada_ok', 'unknown'],
     }
     const f = createFilter([frontend, backend])
-    expect(f(job('Senior Frontend Engineer'))).toEqual({ keep: true, profileIds: ['frontend', 'backend'] })
-    expect(f(job('Senior Frontend Engineer', 'unknown'))).toEqual({ keep: true, profileIds: ['backend'] })
+    expect(f(job('Senior Frontend Engineer'))).toEqual({
+      keep: true,
+      profileIds: ['frontend', 'backend'],
+    })
+    expect(f(job('Senior Frontend Engineer', 'unknown'))).toEqual({
+      keep: true,
+      profileIds: ['backend'],
+    })
   })
 
   it('an exclude in one profile does not block another profile', () => {

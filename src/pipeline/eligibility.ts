@@ -79,7 +79,10 @@ const DESC_CANADA_OK =
   /\b(remote|anywhere|based|located|reside|residing|live|living|work|working)\b[^.\n]{0,40}?\b(in|within|from|across)\s+(canada|north america)\b|\bcanada[- ]based\b|\b(candidates|applicants) (in|from) canada\b/i
 const US = String.raw`(U\.S\.|US\b|USA\b|united states\b)`
 const DESC_US_ONLY = [
-  new RegExp(String.raw`\b(authori[sz]ed|eligible|legally (able|permitted)) to work in the ${US}`, 'i'),
+  new RegExp(
+    String.raw`\b(authori[sz]ed|eligible|legally (able|permitted)) to work in the ${US}`,
+    'i',
+  ),
   new RegExp(String.raw`\bmust (be located|be based|reside|live) in the ${US}`, 'i'),
   new RegExp(String.raw`\bremote within the ${US}`, 'i'),
   /\bunited states[- ]only\b/i,
@@ -105,7 +108,13 @@ function detectPlace(text: string): Place | null {
   ) {
     return { kind: 'CA' }
   }
-  if (US_COUNTRY_NAME.test(text) || US_COUNTRY_CODE.test(text) || US_STATE_CODES.test(text) || US_STATES.test(text) || US_CITIES.test(text)) {
+  if (
+    US_COUNTRY_NAME.test(text) ||
+    US_COUNTRY_CODE.test(text) ||
+    US_STATE_CODES.test(text) ||
+    US_STATES.test(text) ||
+    US_CITIES.test(text)
+  ) {
     return { kind: 'US' }
   }
   // A named place beats a broad word: "Remote, anywhere in Europe" is about Europe.
@@ -177,12 +186,18 @@ export function classifyEligibility(input: EligibilityInput): EligibilityResult 
     const modes = canadaParts.map((p) => p.mode)
     const eligibility = bestCanadaEligibility(modes)
     const workplaceType =
-      eligibility === 'remote_canada_ok' ? 'remote' : eligibility === 'canada_hybrid' ? 'hybrid' : (modes.find(Boolean) ?? null)
+      eligibility === 'remote_canada_ok'
+        ? 'remote'
+        : eligibility === 'canada_hybrid'
+          ? 'hybrid'
+          : (modes.find(Boolean) ?? null)
     return { eligibility, country: 'CA', workplaceType }
   }
 
   const firstMode = parts.find((p) => p.mode)?.mode ?? jobMode
-  const firstPlace = placeLabel(parts.find((p) => p.place && p.place.kind !== 'REGION')?.place ?? null)
+  const firstPlace = placeLabel(
+    parts.find((p) => p.place && p.place.kind !== 'REGION')?.place ?? null,
+  )
   const allPlaced = parts.length > 0 && parts.every((p) => p.place && p.place.kind !== 'REGION')
 
   // 2. Every location is placed and none is in Canada.

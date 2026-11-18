@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { classifyEligibility, type LocationInput } from '../eligibility'
 import { JobSchema, type Job, type Salary, type SourceId, type WorkplaceType } from '../schema'
 import { htmlToText, normalizeKey, sha256 } from '../text'
@@ -68,7 +69,10 @@ export function buildJob(d: JobDraft): NormalizeResult {
 }
 
 /** Parse a raw posting with a lenient schema, turning failures into a NormalizeResult. */
-export function parseRaw<T>(schema: z.ZodType<T>, raw: unknown): { ok: true; data: T } | { ok: false; error: string; sourceJobId?: string } {
+export function parseRaw<T>(
+  schema: z.ZodType<T>,
+  raw: unknown,
+): { ok: true; data: T } | { ok: false; error: string; sourceJobId?: string } {
   const parsed = schema.safeParse(raw)
   if (parsed.success) return { ok: true, data: parsed.data }
   const id = (raw as { id?: unknown } | null)?.id

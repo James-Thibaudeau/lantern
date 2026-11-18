@@ -1,6 +1,8 @@
 import type { Job, Profile } from './schema'
 
-export type FilterResult = { keep: true; profileIds: string[] } | { keep: false; reason: 'title' | 'eligibility' }
+export type FilterResult =
+  | { keep: true; profileIds: string[] }
+  | { keep: false; reason: 'title' | 'eligibility' }
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -17,7 +19,9 @@ function phraseMatcher(phrases: string[]): (title: string) => boolean {
  * The early filter that runs in the Action. A job is kept if at least one enabled profile
  * matches its title (an include phrase, no exclude phrase) and allows its eligibility.
  */
-export function createFilter(profiles: Profile[]): (job: Pick<Job, 'title' | 'eligibility'>) => FilterResult {
+export function createFilter(
+  profiles: Profile[],
+): (job: Pick<Job, 'title' | 'eligibility'>) => FilterResult {
   const compiled = profiles
     .filter((p) => p.enabled)
     .map((p) => ({

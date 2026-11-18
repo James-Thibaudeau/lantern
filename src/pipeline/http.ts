@@ -33,6 +33,8 @@ function isRetryable(err: unknown): boolean {
 export function createHttpClient(opts: HttpOptions = {}): HttpClient {
   const { timeoutMs = 20_000, retries = 2, backoffMs = 1_000, fetchImpl = fetch } = opts
 
+  // Retries are sequential on purpose: each attempt waits for the previous one to fail.
+  /* oxlint-disable no-await-in-loop */
   async function request(url: string, init: RequestInit): Promise<unknown> {
     let lastErr: unknown
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -51,10 +53,11 @@ export function createHttpClient(opts: HttpOptions = {}): HttpClient {
       }
     }
     if (lastErr instanceof Error && lastErr.name === 'TimeoutError') {
-      throw new Error(`Timed out after ${timeoutMs / 1000}s: ${url}`)
+      throw new Error(`Timed out after ${timeoutMs / 1000}s: ${url}`, { cause: lastErr })
     }
     throw lastErr
   }
+  /* oxlint-enable no-await-in-loop */
 
   return {
     getJson: (url) => request(url, { method: 'GET' }),
@@ -68,12 +71,18 @@ export function createHttpClient(opts: HttpOptions = {}): HttpClient {
 }
 
 /** Run fn over items with at most `limit` in flight; results keep input order. */
-export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
+export async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
   let next = 0
   async function worker() {
     while (next < items.length) {
       const i = next++
+      // Each worker handles one item at a time; the `limit` workers run in parallel.
+      // oxlint-disable-next-line no-await-in-loop
       results[i] = await fn(items[i])
     }
   }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { htmlToText, normalizeKey, sha256, toIso } from '../text'
 
 describe('htmlToText', () => {
@@ -7,7 +8,12 @@ describe('htmlToText', () => {
     const text = htmlToText(html)
     // Each item gets its own line. (Consecutive <li>s currently come out separated by a
     // blank line, because </li> and the next <li> each add a newline.)
-    expect(text.split('\n').filter(Boolean)).toEqual(['About us', '• Build things', '• Ship things', 'Apply now'])
+    expect(text.split('\n').filter(Boolean)).toEqual([
+      'About us',
+      '• Build things',
+      '• Ship things',
+      'Apply now',
+    ])
     expect(text.startsWith('About us\n')).toBe(true)
     expect(text.endsWith('\nApply now')).toBe(true)
   })
@@ -37,7 +43,9 @@ describe('htmlToText', () => {
 
 describe('normalizeKey', () => {
   it('lowercases, strips accents and punctuation, collapses spaces', () => {
-    expect(normalizeKey('  Montréal, QC — Senior   Engineer (Back-End)! ')).toBe('montreal qc senior engineer back end')
+    expect(normalizeKey('  Montréal, QC — Senior   Engineer (Back-End)! ')).toBe(
+      'montreal qc senior engineer back end',
+    )
   })
 
   it('makes equivalent strings equal', () => {
@@ -80,6 +88,8 @@ describe('sha256', () => {
 
 describe('htmlToText list spacing', () => {
   it('puts consecutive list items on adjacent lines', () => {
-    expect(htmlToText('<p>Intro</p><ul><li>A</li><li>B</li></ul><p>End</p>')).toBe('Intro\n\n• A\n• B\n\nEnd')
+    expect(htmlToText('<p>Intro</p><ul><li>A</li><li>B</li></ul><p>End</p>')).toBe(
+      'Intro\n\n• A\n• B\n\nEnd',
+    )
   })
 })

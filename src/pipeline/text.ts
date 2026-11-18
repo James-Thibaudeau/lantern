@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+
 import { decodeHTML } from 'entities'
 
 export function sha256(input: string, length = 64): string {

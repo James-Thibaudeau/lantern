@@ -83,7 +83,8 @@ export interface IngestResult {
   outcomes: JobOutcome[]
 }
 
-const emptyEligibility = () => Object.fromEntries(ELIGIBILITY.map((e) => [e, 0])) as Record<Eligibility, number>
+const emptyEligibility = () =>
+  Object.fromEntries(ELIGIBILITY.map((e) => [e, 0])) as Record<Eligibility, number>
 
 export async function runIngest(opts: IngestOptions): Promise<IngestResult> {
   const now = opts.now ?? (() => new Date())
@@ -141,7 +142,10 @@ export async function runIngest(opts: IngestOptions): Promise<IngestResult> {
         if (!result.ok) {
           report.normalizeErrors++
           if (report.normalizeErrorSamples.length < 3) {
-            report.normalizeErrorSamples.push({ sourceJobId: result.sourceJobId, error: result.error })
+            report.normalizeErrorSamples.push({
+              sourceJobId: result.sourceJobId,
+              error: result.error,
+            })
           }
           continue
         }
@@ -172,8 +176,12 @@ export async function runIngest(opts: IngestOptions): Promise<IngestResult> {
   const eligibility = emptyEligibility()
   for (const o of outcomes) eligibility[o.job.eligibility]++
 
-  const sum = (k: keyof Pick<CompanyReport, 'fetched' | 'normalized' | 'normalizeErrors' | 'kept' | 'droppedTitle' | 'droppedEligibility'>) =>
-    reports.reduce((n, r) => n + r[k], 0)
+  const sum = (
+    k: keyof Pick<
+      CompanyReport,
+      'fetched' | 'normalized' | 'normalizeErrors' | 'kept' | 'droppedTitle' | 'droppedEligibility'
+    >,
+  ) => reports.reduce((n, r) => n + r[k], 0)
   const ok = reports.filter((r) => r.status === 'ok').length
 
   const finished = now()
@@ -200,7 +208,9 @@ export async function runIngest(opts: IngestOptions): Promise<IngestResult> {
     companies: reports,
   }
 
-  const completeCompanies = reports.filter((r) => r.status === 'ok' && r.complete).map((r) => r.slug)
+  const completeCompanies = reports
+    .filter((r) => r.status === 'ok' && r.complete)
+    .map((r) => r.slug)
   const complete = new Set(completeCompanies)
   const open: OpenListing = {
     runId,

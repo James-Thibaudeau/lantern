@@ -9,9 +9,7 @@ export const CompanySchema = z.object({
   name: z.string().min(1),
   ats: z.enum(ATS),
   slug: z.string().min(1),
-  workday: z
-    .object({ tenant: z.string(), host: z.string(), site: z.string() })
-    .optional(),
+  workday: z.object({ tenant: z.string(), host: z.string(), site: z.string() }).optional(),
 })
 export type Company = z.infer<typeof CompanySchema>
 
@@ -49,7 +47,14 @@ export const SalarySchema = z.object({
 })
 export type Salary = z.infer<typeof SalarySchema>
 
-export const SourceIdSchema = z.enum(['greenhouse', 'lever', 'ashby', 'workday', 'remotive', 'bamboohr'])
+export const SourceIdSchema = z.enum([
+  'greenhouse',
+  'lever',
+  'ashby',
+  'workday',
+  'remotive',
+  'bamboohr',
+])
 export type SourceId = z.infer<typeof SourceIdSchema>
 
 export const JobSchema = z.object({

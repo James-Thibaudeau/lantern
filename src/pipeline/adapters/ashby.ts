@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import type { LocationInput } from '../eligibility'
 import type { Salary, WorkplaceType } from '../schema'
 import { toIso } from '../text'
@@ -18,7 +19,9 @@ const RawJob = z.looseObject({
   id: z.string(),
   title: z.string(),
   location: z.string().nullish(),
-  secondaryLocations: z.array(z.looseObject({ location: z.string().nullish(), address: Address })).nullish(),
+  secondaryLocations: z
+    .array(z.looseObject({ location: z.string().nullish(), address: Address }))
+    .nullish(),
   isListed: z.boolean().nullish(),
   isRemote: z.boolean().nullish(),
   workplaceType: z.string().nullish(), // OnSite | Remote | Hybrid
@@ -47,7 +50,10 @@ const RawJob = z.looseObject({
 const Response = z.looseObject({ jobs: z.array(z.unknown()) })
 
 // Ashby sets isRemote: true on some hybrid jobs, so workplaceType wins when present.
-function workplace(type: string | null | undefined, isRemote: boolean | null | undefined): WorkplaceType | null {
+function workplace(
+  type: string | null | undefined,
+  isRemote: boolean | null | undefined,
+): WorkplaceType | null {
   switch (type?.toLowerCase()) {
     case 'onsite':
       return 'onsite'
@@ -86,7 +92,11 @@ export const ashby: SourceAdapter = {
 
     const mode = workplace(j.workplaceType, j.isRemote)
     const locations: LocationInput[] = [
-      { text: j.location ?? '', country: j.address?.postalAddress?.addressCountry, workplaceType: mode },
+      {
+        text: j.location ?? '',
+        country: j.address?.postalAddress?.addressCountry,
+        workplaceType: mode,
+      },
       ...(j.secondaryLocations ?? []).map((s) => ({
         text: s.location ?? '',
         country: s.address?.postalAddress?.addressCountry,

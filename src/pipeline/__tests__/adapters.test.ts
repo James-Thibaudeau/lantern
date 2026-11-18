@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
+
 import { ashby } from '../adapters/ashby'
 import { greenhouse } from '../adapters/greenhouse'
 import { lever } from '../adapters/lever'
@@ -26,6 +28,11 @@ function expectOk(r: NormalizeResult): Job {
   return r.job
 }
 
+function expectErr(r: NormalizeResult): Extract<NormalizeResult, { ok: false }> {
+  if (r.ok) throw new Error('expected normalize to fail, but it succeeded')
+  return r
+}
+
 const byId = (jobs: Raw[], id: string | number) => {
   const j = jobs.find((x) => x.id === id)
   if (!j) throw new Error(`fixture posting ${id} not found`)
@@ -33,13 +40,16 @@ const byId = (jobs: Raw[], id: string | number) => {
 }
 
 describe('greenhouse.normalize', () => {
-  it.each(ghJobs.map((j) => [j.id, j] as const))('posting %s normalizes ok and passes JobSchema', (_id, raw) => {
-    const job = expectOk(greenhouse.normalize(raw, ghCompany))
-    expect(JobSchema.parse(job)).toEqual(job)
-    expect(job.source).toBe('greenhouse')
-    expect(job.companySlug).toBe('tailscale')
-    expect(job.company).toBe('Tailscale')
-  })
+  it.each(ghJobs.map((j) => [j.id, j] as const))(
+    'posting %s normalizes ok and passes JobSchema',
+    (_id, raw) => {
+      const job = expectOk(greenhouse.normalize(raw, ghCompany))
+      expect(JobSchema.parse(job)).toEqual(job)
+      expect(job.source).toBe('greenhouse')
+      expect(job.companySlug).toBe('tailscale')
+      expect(job.company).toBe('Tailscale')
+    },
+  )
 
   it('decodes the entity-escaped content into real HTML', () => {
     for (const raw of ghJobs) {
@@ -95,20 +105,18 @@ describe('greenhouse.normalize', () => {
   it('contentHash changes when the title changes; id does not', () => {
     const raw = ghJobs[0]
     const a = expectOk(greenhouse.normalize(raw, ghCompany))
-    const b = expectOk(greenhouse.normalize({ ...raw, title: `${raw.title as string} II` }, ghCompany))
+    const b = expectOk(
+      greenhouse.normalize({ ...raw, title: `${raw.title as string} II` }, ghCompany),
+    )
     expect(b.id).toBe(a.id)
     expect(b.contentHash).not.toBe(a.contentHash)
   })
 
   it('returns ok:false instead of throwing when title is missing', () => {
     const { title: _omit, ...raw } = ghJobs[0]
-    const r = greenhouse.normalize(raw, ghCompany)
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(typeof r.error).toBe('string')
-      expect(r.error).toMatch(/title/)
-      expect(r.sourceJobId).toBe(String(ghJobs[0].id))
-    }
+    const r = expectErr(greenhouse.normalize(raw, ghCompany))
+    expect(r.error).toMatch(/title/)
+    expect(r.sourceJobId).toBe(String(ghJobs[0].id))
   })
 
   it('returns ok:false for a non-URL absolute_url (caught by JobSchema)', () => {
@@ -130,12 +138,15 @@ describe('greenhouse.normalize', () => {
 })
 
 describe('lever.normalize', () => {
-  it.each(leverJobs.map((j) => [j.id, j] as const))('posting %s normalizes ok and passes JobSchema', (_id, raw) => {
-    const job = expectOk(lever.normalize(raw, leverCompany))
-    expect(JobSchema.parse(job)).toEqual(job)
-    expect(job.source).toBe('lever')
-    expect(job.postedAt).toMatch(/Z$/)
-  })
+  it.each(leverJobs.map((j) => [j.id, j] as const))(
+    'posting %s normalizes ok and passes JobSchema',
+    (_id, raw) => {
+      const job = expectOk(lever.normalize(raw, leverCompany))
+      expect(JobSchema.parse(job)).toEqual(job)
+      expect(job.source).toBe('lever')
+      expect(job.postedAt).toMatch(/Z$/)
+    },
+  )
 
   it.each<[string, Eligibility]>([
     ['48afd4ef-dff0-4b59-94a2-3a3df2aa3c34', 'remote_canada_ok'], // Ottawa, ON; CA; remote
@@ -167,7 +178,9 @@ describe('lever.normalize', () => {
   })
 
   it('joins all locations into locationText', () => {
-    const job = expectOk(lever.normalize(byId(leverJobs, '0e42d27c-8f96-4ad8-98cd-fc7334a01a9e'), leverCompany))
+    const job = expectOk(
+      lever.normalize(byId(leverJobs, '0e42d27c-8f96-4ad8-98cd-fc7334a01a9e'), leverCompany),
+    )
     expect(job.locationText).toBe('Canada Remote; USA Remote')
   })
 
@@ -186,21 +199,21 @@ describe('lever.normalize', () => {
 
   it('returns ok:false instead of throwing when text (title) is missing', () => {
     const { text: _omit, ...raw } = leverJobs[0]
-    const r = lever.normalize(raw, leverCompany)
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(typeof r.error).toBe('string')
-      expect(r.sourceJobId).toBe(leverJobs[0].id)
-    }
+    const r = expectErr(lever.normalize(raw, leverCompany))
+    expect(r.error).toEqual(expect.any(String))
+    expect(r.sourceJobId).toBe(leverJobs[0].id)
   })
 })
 
 describe('ashby.normalize', () => {
-  it.each(ashbyJobs.map((j) => [j.title, j] as const))('"%s" normalizes ok and passes JobSchema', (_t, raw) => {
-    const job = expectOk(ashby.normalize(raw, ashbyCompany))
-    expect(JobSchema.parse(job)).toEqual(job)
-    expect(job.source).toBe('ashby')
-  })
+  it.each(ashbyJobs.map((j) => [j.title, j] as const))(
+    '"%s" normalizes ok and passes JobSchema',
+    (_t, raw) => {
+      const job = expectOk(ashby.normalize(raw, ashbyCompany))
+      expect(JobSchema.parse(job)).toEqual(job)
+      expect(job.source).toBe('ashby')
+    },
+  )
 
   const byTitle = (title: string) => {
     const j = ashbyJobs.find((x) => x.title === title)
@@ -218,12 +231,16 @@ describe('ashby.normalize', () => {
   })
 
   it("maps the Salary component: '1 YEAR' → period 'year' with CAD", () => {
-    const job = expectOk(ashby.normalize(byTitle('Manager, Treasury Cash & Settlements'), ashbyCompany))
+    const job = expectOk(
+      ashby.normalize(byTitle('Manager, Treasury Cash & Settlements'), ashbyCompany),
+    )
     expect(job.salary).toEqual({ min: 116000, max: 145000, currency: 'CAD', period: 'year' })
   })
 
   it('salary is null when there is no compensation', () => {
-    const job = expectOk(ashby.normalize(byTitle('Staff/Senior Product Designer, Growth'), ashbyCompany))
+    const job = expectOk(
+      ashby.normalize(byTitle('Staff/Senior Product Designer, Growth'), ashbyCompany),
+    )
     expect(job.salary).toBeNull()
   })
 
@@ -232,8 +249,20 @@ describe('ashby.normalize', () => {
       ...ashbyJobs[0],
       compensation: {
         summaryComponents: [
-          { compensationType: 'EquityCashValue', interval: '1 YEAR', currencyCode: 'CAD', minValue: null, maxValue: null },
-          { compensationType: 'Salary', interval: '1 HOUR', currencyCode: 'CAD', minValue: 25, maxValue: 26.5 },
+          {
+            compensationType: 'EquityCashValue',
+            interval: '1 YEAR',
+            currencyCode: 'CAD',
+            minValue: null,
+            maxValue: null,
+          },
+          {
+            compensationType: 'Salary',
+            interval: '1 HOUR',
+            currencyCode: 'CAD',
+            minValue: 25,
+            maxValue: 26.5,
+          },
         ],
       },
     }
@@ -252,13 +281,9 @@ describe('ashby.normalize', () => {
 
   it('returns ok:false instead of throwing when title is missing', () => {
     const { title: _omit, ...raw } = ashbyJobs[0]
-    const r = ashby.normalize(raw, ashbyCompany)
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(typeof r.error).toBe('string')
-      expect(r.error).toMatch(/title/)
-      expect(r.sourceJobId).toBe(ashbyJobs[0].id)
-    }
+    const r = expectErr(ashby.normalize(raw, ashbyCompany))
+    expect(r.error).toMatch(/title/)
+    expect(r.sourceJobId).toBe(ashbyJobs[0].id)
   })
 })
 
@@ -267,8 +292,14 @@ describe('fixtures', () => {
     const fields = [
       ...ghJobs.map((j) => j.content),
       ...ashbyJobs.flatMap((j) => [j.descriptionHtml, j.descriptionPlain]),
-      ...leverJobs.flatMap((j) => [j.description, j.descriptionPlain, j.additional, j.additionalPlain]),
+      ...leverJobs.flatMap((j) => [
+        j.description,
+        j.descriptionPlain,
+        j.additional,
+        j.additionalPlain,
+      ]),
     ]
-    for (const f of fields) if (typeof f === 'string') expect(f.length).toBeLessThanOrEqual(400)
+    const longest = Math.max(0, ...fields.map((f) => (typeof f === 'string' ? f.length : 0)))
+    expect(longest).toBeLessThanOrEqual(400)
   })
 })

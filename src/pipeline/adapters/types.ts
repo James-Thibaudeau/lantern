@@ -15,7 +15,9 @@ export interface FetchResult {
   complete: boolean
 }
 
-export type NormalizeResult = { ok: true; job: Job } | { ok: false; error: string; sourceJobId?: string }
+export type NormalizeResult =
+  | { ok: true; job: Job }
+  | { ok: false; error: string; sourceJobId?: string }
 
 export interface SourceAdapter {
   id: SourceId

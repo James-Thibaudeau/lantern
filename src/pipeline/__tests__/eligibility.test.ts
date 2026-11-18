@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { classifyEligibility, type EligibilityInput } from '../eligibility'
 import type { Eligibility, WorkplaceType } from '../schema'
 
@@ -27,7 +28,11 @@ function ashby(opts: {
 }
 
 /** Lever: primary location carries ISO country + workplace type. */
-function lever(opts: { location: string; country: string | null; workplaceType: WorkplaceType | null }): EligibilityInput {
+function lever(opts: {
+  location: string
+  country: string | null
+  workplaceType: WorkplaceType | null
+}): EligibilityInput {
   return {
     locations: [{ text: opts.location, country: opts.country, workplaceType: opts.workplaceType }],
     workplaceType: opts.workplaceType,
@@ -79,35 +84,44 @@ describe('classifyEligibility: description phrases when the location is just "Re
   })
 
   it('a Canada phrase wins over a US phrase', () => {
-    const desc = 'This role is remote within Canada. Candidates in the US must be authorized to work in the U.S.'
+    const desc =
+      'This role is remote within Canada. Candidates in the US must be authorized to work in the U.S.'
     expect(label(gh('Remote', desc))).toBe('remote_canada_ok')
   })
 
   it('ignores description phrases when the location already names a country', () => {
-    expect(label(gh('Remote, United Kingdom', 'This role is remote within Canada.'))).toBe('remote_non_canada')
+    expect(label(gh('Remote, United Kingdom', 'This role is remote within Canada.'))).toBe(
+      'remote_non_canada',
+    )
   })
 })
 
 describe('classifyEligibility: Ashby structured fields', () => {
   it('"Remote (United States | Canada)", remote → remote_canada_ok', () => {
-    expect(label(ashby({ location: 'Remote (United States | Canada)', workplaceType: 'remote' }))).toBe(
-      'remote_canada_ok',
-    )
+    expect(
+      label(ashby({ location: 'Remote (United States | Canada)', workplaceType: 'remote' })),
+    ).toBe('remote_canada_ok')
   })
 
   it('"KOHO (CAN)", remote, country Canada → remote_canada_ok', () => {
-    expect(label(ashby({ location: 'KOHO (CAN)', workplaceType: 'remote', country: 'Canada' }))).toBe(
-      'remote_canada_ok',
-    )
+    expect(
+      label(ashby({ location: 'KOHO (CAN)', workplaceType: 'remote', country: 'Canada' })),
+    ).toBe('remote_canada_ok')
   })
 
   it('"KOHO (CAN)" is recognized from the text alone', () => {
-    expect(label(ashby({ location: 'KOHO (CAN)', workplaceType: 'remote' }))).toBe('remote_canada_ok')
+    expect(label(ashby({ location: 'KOHO (CAN)', workplaceType: 'remote' }))).toBe(
+      'remote_canada_ok',
+    )
   })
 
   it('"San Francisco, California", hybrid, country United States → non_canada_onsite', () => {
     const r = classifyEligibility(
-      ashby({ location: 'San Francisco, California', workplaceType: 'hybrid', country: 'United States' }),
+      ashby({
+        location: 'San Francisco, California',
+        workplaceType: 'hybrid',
+        country: 'United States',
+      }),
     )
     expect(r.eligibility).toBe('non_canada_onsite')
     expect(r.country).toBe('US')
@@ -116,7 +130,11 @@ describe('classifyEligibility: Ashby structured fields', () => {
 
   it('"Toronto, ON", hybrid, secondary "Austin, TX" → canada_hybrid', () => {
     const r = classifyEligibility(
-      ashby({ location: 'Toronto, ON', workplaceType: 'hybrid', secondary: [{ location: 'Austin, TX' }] }),
+      ashby({
+        location: 'Toronto, ON',
+        workplaceType: 'hybrid',
+        secondary: [{ location: 'Austin, TX' }],
+      }),
     )
     expect(r).toEqual({ eligibility: 'canada_hybrid', country: 'CA', workplaceType: 'hybrid' })
   })
@@ -134,30 +152,38 @@ describe('classifyEligibility: Ashby structured fields', () => {
   })
 
   it('uses the structured country when the text names no place', () => {
-    expect(label(ashby({ location: 'Headquarters', workplaceType: 'onsite', country: 'Canada' }))).toBe(
-      'canada_onsite',
-    )
-    expect(label(ashby({ location: 'Headquarters', workplaceType: 'remote', country: 'United States' }))).toBe(
-      'remote_us_only',
-    )
+    expect(
+      label(ashby({ location: 'Headquarters', workplaceType: 'onsite', country: 'Canada' })),
+    ).toBe('canada_onsite')
+    expect(
+      label(ashby({ location: 'Headquarters', workplaceType: 'remote', country: 'United States' })),
+    ).toBe('remote_us_only')
   })
 })
 
 describe('classifyEligibility: Lever structured fields', () => {
   it('"Ottawa, ON", country CA, remote → remote_canada_ok', () => {
-    const r = classifyEligibility(lever({ location: 'Ottawa, ON', country: 'CA', workplaceType: 'remote' }))
+    const r = classifyEligibility(
+      lever({ location: 'Ottawa, ON', country: 'CA', workplaceType: 'remote' }),
+    )
     expect(r).toEqual({ eligibility: 'remote_canada_ok', country: 'CA', workplaceType: 'remote' })
   })
 
   it('"Ashland, VA", country US, onsite → non_canada_onsite', () => {
-    const r = classifyEligibility(lever({ location: 'Ashland, VA', country: 'US', workplaceType: 'onsite' }))
+    const r = classifyEligibility(
+      lever({ location: 'Ashland, VA', country: 'US', workplaceType: 'onsite' }),
+    )
     expect(r).toEqual({ eligibility: 'non_canada_onsite', country: 'US', workplaceType: 'onsite' })
   })
 })
 
 describe('classifyEligibility: edge cases', () => {
   it('no locations at all → unknown', () => {
-    expect(classifyEligibility({ locations: [] })).toEqual({ eligibility: 'unknown', country: null, workplaceType: null })
+    expect(classifyEligibility({ locations: [] })).toEqual({
+      eligibility: 'unknown',
+      country: null,
+      workplaceType: null,
+    })
   })
 
   it('empty text with no structured data → unknown', () => {
@@ -189,7 +215,9 @@ describe('classifyEligibility: fixes found on the first real run', () => {
   })
 
   it('a named place beats "anywhere"', () => {
-    expect(classifyEligibility(gh('Remote, anywhere in Europe')).eligibility).toBe('remote_non_canada')
+    expect(classifyEligibility(gh('Remote, anywhere in Europe')).eligibility).toBe(
+      'remote_non_canada',
+    )
     expect(classifyEligibility(gh('Remote, anywhere')).eligibility).toBe('remote_canada_ok')
   })
 })

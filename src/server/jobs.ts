@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
 import { createServerFn } from '@tanstack/react-start'
+
 import type { IngestReport } from '#/pipeline/ingest'
 import type { Job } from '#/pipeline/schema'
 
@@ -38,7 +40,7 @@ export const getJobs = createServerFn({ method: 'GET' }).handler(async (): Promi
       const { descriptionHtml: _html, ...row } = JSON.parse(line) as Job
       return row
     })
-    .sort((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''))
+    .toSorted((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''))
 
   let run: JobsData['run'] = null
   try {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import type { HttpClient } from '../http'
 import { HttpError } from '../http'
 import { runIngest } from '../ingest'
@@ -99,7 +100,12 @@ describe('runIngest', () => {
 
   it('rejects unknown company slugs', async () => {
     await expect(
-      runIngest({ config: { companies, profiles: [profile] }, http: fakeHttp(), only: ['nope'], politeDelayMs: 0 }),
+      runIngest({
+        config: { companies, profiles: [profile] },
+        http: fakeHttp(),
+        only: ['nope'],
+        politeDelayMs: 0,
+      }),
     ).rejects.toThrow('Unknown company slug(s): nope')
   })
 })
