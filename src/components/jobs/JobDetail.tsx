@@ -4,6 +4,7 @@ import type { JobRow } from '#/server/jobs'
 import { Badge, Button, buttonClass } from '../ui'
 import { EligibilityBadge, ScoreBadge } from './badges'
 import { formatDate, formatSalary, points } from './format'
+import { TailoredResume, useTailoring } from './TailoredResume'
 
 const STATUS_ACTIONS: { status: Exclude<JobStatus, 'new'>; label: string; key: string }[] = [
   { status: 'interested', label: 'Interested', key: 'I' },
@@ -38,6 +39,7 @@ export function JobDetail({
   onBack: () => void
 }) {
   const salary = formatSalary(job.salary)
+  const tailoring = useTailoring(job.id)
   return (
     <article className="mx-auto max-w-3xl px-5 py-6 md:px-8">
       <Button variant="ghost" size="sm" className="mb-3 -ml-2 md:hidden" onClick={onBack}>
@@ -77,15 +79,15 @@ export function JobDetail({
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Button
           variant="primary"
-          disabled
-          title="Resume tailoring is the next thing being built"
-          aria-describedby="tailor-soon"
+          disabled={!tailoring.data?.resume.ready || tailoring.busy}
+          title={tailoring.data?.resume.ready ? undefined : tailoring.data?.resume.message}
+          onClick={() => void tailoring.tailor()}
         >
-          Tailor resume
+          {tailoring.busy ? 'Tailoring…' : tailoring.data?.current ? 'Re-tailor' : 'Tailor resume'}
         </Button>
-        <span id="tailor-soon" className="text-xs text-muted">
-          Coming soon
-        </span>
+        {tailoring.data && !tailoring.data.resume.ready && (
+          <span className="text-xs text-muted">Add resume.json to tailor</span>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -143,6 +145,8 @@ export function JobDetail({
           )}
         </section>
       )}
+
+      <TailoredResume tailoring={tailoring} appliedResumeId={job.appliedResumeId} />
 
       <section aria-labelledby="about-job" className="mt-8 border-t border-line pt-6">
         <h3 id="about-job" className="sr-only">

@@ -1,10 +1,10 @@
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
  * Jobs synced from ingest runs.
  *
  * Column ownership: sync owns the source fields plus firstSeenAt, lastSeenAt, closedAt and
- * lastRunId. `status` and `notes` are local-only; sync never touches them.
+ * lastRunId. `status`, `notes` and `appliedResumeId` are local-only; sync never touches them.
  * Timestamps are ISO 8601 strings.
  */
 export const jobs = sqliteTable(
@@ -43,6 +43,8 @@ export const jobs = sqliteTable(
     // Local only.
     status: text('status').notNull().default('new'),
     notes: text('notes'),
+    /** tailored_resumes.id of the version you applied with. */
+    appliedResumeId: integer('applied_resume_id'),
   },
   (t) => [
     index('jobs_company_open_idx').on(t.companySlug, t.closedAt),
@@ -123,3 +125,33 @@ export const suggestions = sqliteTable(
 )
 
 export type SuggestionRow = typeof suggestions.$inferSelect
+
+/**
+ * Tailored resume versions per job (1, 2, 3… per job). JSON columns are stored as text;
+ * callers validate them with their own schemas.
+ */
+export const tailoredResumes = sqliteTable(
+  'tailored_resumes',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => jobs.id),
+    version: integer('version').notNull(),
+    createdAt: text('created_at').notNull(),
+    model: text('model').notNull(),
+    resumeHash: text('resume_hash').notNull(),
+    jobHash: text('job_hash').notNull(),
+    /** The tailoring, as JSON. */
+    tailoring: text('tailoring').notNull(),
+    /** Checks run on the tailoring, as JSON. */
+    checks: text('checks').notNull(),
+    /** JSON object: change key → accepted. */
+    decisions: text('decisions').notNull().default('{}'),
+    /** Token usage, as JSON. */
+    usage: text('usage'),
+  },
+  (t) => [uniqueIndex('tailored_resumes_job_version_idx').on(t.jobId, t.version)],
+)
+
+export type TailoredResumeRow = typeof tailoredResumes.$inferSelect

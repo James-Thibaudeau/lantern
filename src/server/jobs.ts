@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { setJobStatus as updateJobStatus } from '#/db/jobs'
 import { ingestRuns, jobs, type JobRowDb } from '#/db/schema'
+import { latestTailoring, setAppliedResume } from '#/db/tailored'
 import {
   EligibilitySchema,
   JobStatusSchema,
@@ -33,6 +34,8 @@ export interface JobRow {
   firstSeenAt: string
   closedAt: string | null
   status: JobStatus
+  /** The tailored resume version you applied with, if any. */
+  appliedResumeId: number | null
   /** Null when there are no ranking criteria. */
   score: number | null
   reasons: Reason[]
@@ -78,6 +81,7 @@ function toRow(j: JobRowDb, score: ((job: ScorableJob) => JobScore) | null): Job
     postedAt: j.postedAt,
     firstSeenAt: j.firstSeenAt,
     closedAt: j.closedAt,
+    appliedResumeId: j.appliedResumeId,
     status: JobStatusSchema.catch('new').parse(j.status),
     score: s?.score ?? null,
     reasons: s?.reasons ?? [],
@@ -132,11 +136,20 @@ export const syncNow = createServerFn({ method: 'POST' }).handler(() => runSync(
 
 const SetStatusInput = z.object({ id: z.string().min(1), status: JobStatusSchema })
 
-/** Interested / Applied / Dismiss (and back to the inbox). */
+/**
+ * Interested / Applied / Dismiss (and back to the inbox). Marking a job Applied also records
+ * the latest tailored resume for it, so you know which version you sent.
+ */
 export const setJobStatus = createServerFn({ method: 'POST' })
   .validator((input: unknown) => SetStatusInput.parse(input))
-  .handler(({ data }): { ok: boolean; message: string } =>
-    updateJobStatus(getDb(), data.id, data.status)
-      ? { ok: true, message: 'Saved.' }
-      : { ok: false, message: 'That job is no longer in the database. Try Sync.' },
-  )
+  .handler(({ data }): { ok: boolean; message: string } => {
+    const db = getDb()
+    if (!updateJobStatus(db, data.id, data.status)) {
+      return { ok: false, message: 'That job is no longer in the database. Try Sync.' }
+    }
+    if (data.status === 'applied') {
+      const latest = latestTailoring(db, data.id)
+      if (latest) setAppliedResume(db, data.id, latest.id)
+    }
+    return { ok: true, message: 'Saved.' }
+  })

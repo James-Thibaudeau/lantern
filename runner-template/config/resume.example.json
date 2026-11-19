@@ -1,0 +1,59 @@
+{
+  "basics": {
+    "name": "Alex Example",
+    "headline": "Senior Frontend Engineer",
+    "location": "Toronto, ON",
+    "email": "alex@example.com",
+    "links": [{ "label": "GitHub", "url": "https://github.com/example" }]
+  },
+  "summary": "Frontend engineer with 7 years building React applications and the design systems behind them.",
+  "skills": [
+    { "group": "Languages", "items": ["TypeScript", "JavaScript", "HTML", "CSS"] },
+    { "group": "Frameworks", "items": ["React", "Next.js", "Node.js"] },
+    { "group": "Tooling", "items": ["Vite", "Vitest", "Playwright"] }
+  ],
+  "experience": [
+    {
+      "id": "acme",
+      "title": "Senior Frontend Engineer",
+      "employer": "Acme Corp",
+      "dates": "2021 – Present",
+      "context": "Design Systems team",
+      "bullets": [
+        {
+          "id": "acme-design-system",
+          "text": "Built the company design system used by 6 product teams, with accessible React components and documentation."
+        },
+        {
+          "id": "acme-ci",
+          "text": "Cut CI time 40% by caching builds and splitting the test suite."
+        }
+      ],
+      "stack": ["TypeScript", "React", "Vite"]
+    },
+    {
+      "id": "initech",
+      "title": "Frontend Developer",
+      "employer": "Initech",
+      "dates": "2018 – 2021",
+      "bullets": [
+        {
+          "id": "initech-reports",
+          "text": "Rewrote the reporting dashboard in React, replacing a legacy jQuery app."
+        }
+      ],
+      "stack": ["JavaScript", "React"]
+    },
+    {
+      "id": "startup-intern",
+      "title": "Web Developer Intern",
+      "employer": "Small Startup",
+      "dates": "2017",
+      "context": "Built customer-facing features for the signup flow.",
+      "compact": true
+    }
+  ],
+  "education": [
+    { "credential": "BSc Computer Science", "school": "Example University", "year": "2017" }
+  ]
+}

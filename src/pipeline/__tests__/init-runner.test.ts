@@ -57,6 +57,7 @@ describe('initRunner (local only)', () => {
       'companies.json',
       'criteria.json',
       'profiles.json',
+      'resume.json',
     ])
     expect(await readdir(join(dir, '.github', 'workflows'))).toEqual(['run.yml'])
     const { stdout } = await run('git', ['log', '--format=%s'], { cwd: dir })

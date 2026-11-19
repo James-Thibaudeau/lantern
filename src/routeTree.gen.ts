@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as RunsRouteImport } from './routes/runs'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
+import { Route as PrintResumeTailoredIdRouteImport } from './routes/print/resume/$tailoredId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const WatchlistRoute = WatchlistRouteImport.update({
   path: '/watchlist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrintResumeTailoredIdRoute = PrintResumeTailoredIdRouteImport.update({
+  id: '/print/resume/$tailoredId',
+  path: '/print/resume/$tailoredId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/jobs': typeof JobsRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/jobs': typeof JobsRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jobs' | '/runs' | '/watchlist'
+  fullPaths:
+    '/' | '/jobs' | '/runs' | '/watchlist' | '/print/resume/$tailoredId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jobs' | '/runs' | '/watchlist'
-  id: '__root__' | '/' | '/jobs' | '/runs' | '/watchlist'
+  to: '/' | '/jobs' | '/runs' | '/watchlist' | '/print/resume/$tailoredId'
+  id:
+    | '__root__'
+    | '/'
+    | '/jobs'
+    | '/runs'
+    | '/watchlist'
+    | '/print/resume/$tailoredId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   RunsRoute: typeof RunsRoute
   WatchlistRoute: typeof WatchlistRoute
+  PrintResumeTailoredIdRoute: typeof PrintResumeTailoredIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WatchlistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/print/resume/$tailoredId': {
+      id: '/print/resume/$tailoredId'
+      path: '/print/resume/$tailoredId'
+      fullPath: '/print/resume/$tailoredId'
+      preLoaderRoute: typeof PrintResumeTailoredIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   RunsRoute: RunsRoute,
   WatchlistRoute: WatchlistRoute,
+  PrintResumeTailoredIdRoute: PrintResumeTailoredIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

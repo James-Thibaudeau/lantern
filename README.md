@@ -4,7 +4,7 @@ Lantern finds job postings on company job boards, keeps the ones that match what
 
 It reads the public job-board APIs that companies already publish (Greenhouse, Lever and Ashby today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
 
-> **Status:** ingestion, the daily Action, local sync into SQLite, watchlist tools and rules-based ranking work end to end, with jobs, watchlist and run-history pages. Resume tailoring is next.
+> **Status:** ingestion, the daily Action, local sync into SQLite, watchlist tools, rules-based ranking, a job inbox (Interested / Applied / Dismissed) and resume tailoring work end to end.
 
 ## How it works
 
@@ -107,6 +107,20 @@ pnpm cli rank --config ../lantern-runner/config --explain 3fa2 # one job's point
 
 The app reads the criteria again on every Sync. To try changes in the app before pushing them, set `LANTERN_CONFIG_DIR=../lantern-runner/config` in `.env`. Without a `criteria.json`, jobs are listed newest first.
 
+## Tailoring
+
+**Tailor resume** in a job's detail pane tailors your resume to that posting. It works from `config/resume.json` in your runner repo, your master resume as data: basics, summary, skill groups, and jobs whose bullets each have an `id`. Start from `runner-template/config/resume.example.json`.
+
+Tailoring never invents. The model may only pick, reorder and lightly reword your bullets, reorder skills, and rewrite the summary. Employers, titles, dates and education always come from `resume.json`. Code then checks the result: a reworded bullet can't contain a number its original doesn't, skills must already be in your resume, and bullets can't move between jobs. Anything that fails is dropped or reverted to your wording, and terms your resume never mentions are flagged for you to look at.
+
+You review each change (accept or revert), with a live preview. **Open** shows the resume as its own page to print to PDF (⌘P), and **Download HTML** saves it as a standalone file. Each run is kept as a version, and marking a job Applied records which version you used.
+
+It runs the [Claude Code](https://code.claude.com) CLI (`claude -p`) on your Claude subscription, not the API: install it and sign in once with `claude auth login`. Lantern removes `ANTHROPIC_API_KEY` from the CLI's environment so it never bills an API key. Settings in `.env`: `LANTERN_CLAUDE_BIN` (default `claude`), `LANTERN_TAILOR_MODEL` (default `opus`), `LANTERN_TAILOR_EFFORT` (default `medium`).
+
+```bash
+pnpm cli tailor 3fa2 --config ../lantern-runner/config   # tailor one job (id prefix) and print the changes
+```
+
 ## Development
 
 | Command                         | What it does                                           |
@@ -116,6 +130,7 @@ The app reads the criteria again on every Sync. To try changes in the app before
 | `pnpm sync`                     | Pull new runner results into `data/lantern.db`         |
 | `pnpm cli hn-suggest`           | Suggest companies from HN's "Who is hiring?"           |
 | `pnpm cli rank`                 | Print open jobs ranked by `criteria.json`              |
+| `pnpm cli tailor <job id>`      | Tailor `resume.json` to one job with `claude -p`       |
 | `pnpm db:generate`              | New migration after editing `src/db/schema.ts`         |
 | `pnpm check`                    | Format check, lint, typecheck and tests (what CI runs) |
 | `pnpm format` / `pnpm lint:fix` | Fix formatting / auto-fixable lint                     |

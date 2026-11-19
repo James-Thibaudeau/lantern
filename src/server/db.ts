@@ -2,6 +2,7 @@ import { openDb, type Db } from '#/db'
 import { createScorer, type JobScore, type ScorableJob } from '#/rank/score'
 import { githubRunner, loadLocalEnv } from '#/sync/settings'
 import { sync, type SyncResult } from '#/sync/sync'
+import type { Resume } from '#/tailor/resume'
 import { GitHubConfigStore, LocalConfigStore, type ConfigStore } from '#/watchlist/runner-config'
 
 // Server-only helpers shared by the server functions. One DB connection per server process.
@@ -54,11 +55,25 @@ export function rankingStatus(): RankingStatus {
   return ranking
 }
 
+export interface ResumeStatus {
+  /** The master resume, or null when there isn't one (or it couldn't be read). */
+  resume: Resume | null
+  ok: boolean
+  /** One line for the UI. */
+  message: string
+}
+
+let master: ResumeStatus = { resume: null, ok: true, message: 'resume.json not read yet.' }
+
+export function resumeStatus(): ResumeStatus {
+  return master
+}
+
 /**
- * criteria.json comes from the runner repo, or from LANTERN_CONFIG_DIR (a local folder) so
- * you can tune it without pushing.
+ * criteria.json and resume.json come from the runner repo, or from LANTERN_CONFIG_DIR (a
+ * local folder) so you can edit them without pushing.
  */
-async function criteriaStore(): Promise<ConfigStore> {
+export async function configStoreForApp(): Promise<ConfigStore> {
   const dir = process.env.LANTERN_CONFIG_DIR?.trim()
   if (dir) return new LocalConfigStore(dir)
   const { runner, settings } = await githubRunner()
@@ -69,7 +84,7 @@ async function criteriaStore(): Promise<ConfigStore> {
 async function reloadCriteria(): Promise<void> {
   let where = 'the runner repo'
   try {
-    const store = await criteriaStore()
+    const store = await configStoreForApp()
     where = store.describe
     const criteria = await store.readCriteria()
     ranking = criteria
@@ -98,12 +113,39 @@ async function reloadCriteria(): Promise<void> {
   }
 }
 
+/** Reads resume.json again. A failed read keeps the last resume that worked. */
+export async function reloadResume(): Promise<ResumeStatus> {
+  let where = 'the runner repo'
+  try {
+    const store = await configStoreForApp()
+    where = store.describe
+    const resume = await store.readResume()
+    master = resume
+      ? { resume, ok: true, message: `Using resume.json from ${where}.` }
+      : {
+          resume: null,
+          ok: true,
+          message: `No resume.json in ${where}. Add one to tailor resumes; see "Tailoring" in the README.`,
+        }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    master = {
+      resume: master.resume,
+      ok: false,
+      message:
+        `Couldn't read resume.json from ${where}: ${reason}` +
+        (master.resume ? ' Still using the last version read.' : ''),
+    }
+  }
+  return master
+}
+
 /** Runs a sync, or joins the one already in progress. Never throws. */
 export function runSync(): Promise<SyncStatus> {
   running ??= (async (): Promise<SyncStatus> => {
     const at = new Date().toISOString()
-    // Sync is when the app picks up config changes, so criteria are read again here too.
-    await reloadCriteria()
+    // Sync is when the app picks up config changes, so criteria and the resume are read again.
+    await Promise.all([reloadCriteria(), reloadResume()])
     try {
       const { runner } = await githubRunner()
       const result = await sync(getDb(), runner)

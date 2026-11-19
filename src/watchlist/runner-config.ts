@@ -5,6 +5,7 @@ import { formatCompanies, parseCompanies, parseConfig, type IngestConfig } from 
 import type { Company } from '#/pipeline/schema'
 import { parseCriteria, type Criteria } from '#/rank/criteria'
 import { GitHubConflictError, type GitHubRunner } from '#/sync/github'
+import { parseResume, type Resume } from '#/tailor/resume'
 
 import { boardKey } from './detect'
 
@@ -17,12 +18,24 @@ export interface ConfigStore {
   addCompany(company: Company): Promise<'added' | 'exists'>
   /** Reads criteria.json for ranking; null when there isn't one. */
   readCriteria(): Promise<Criteria | null>
+  /** Reads resume.json, the master resume for tailoring; null when there isn't one. */
+  readResume(): Promise<Resume | null>
 }
 
 function withCompany(companies: Company[], company: Company): Company[] | null {
   const key = boardKey(company)
   if (companies.some((c) => boardKey(c) === key || c.slug === company.slug)) return null
   return [...companies, company]
+}
+
+/** A file's text, or null when it doesn't exist. */
+async function readOptional(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch (err) {
+    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return null
+    throw err
+  }
 }
 
 export class LocalConfigStore implements ConfigStore {
@@ -51,14 +64,14 @@ export class LocalConfigStore implements ConfigStore {
 
   async readCriteria(): Promise<Criteria | null> {
     const path = join(this.dir, 'criteria.json')
-    let text: string
-    try {
-      text = await readFile(path, 'utf8')
-    } catch (err) {
-      if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return null
-      throw err
-    }
-    return parseCriteria(path, text)
+    const text = await readOptional(path)
+    return text === null ? null : parseCriteria(path, text)
+  }
+
+  async readResume(): Promise<Resume | null> {
+    const path = join(this.dir, 'resume.json')
+    const text = await readOptional(path)
+    return text === null ? null : parseResume(path, text)
   }
 }
 
@@ -108,5 +121,10 @@ export class GitHubConfigStore implements ConfigStore {
   async readCriteria(): Promise<Criteria | null> {
     const file = await this.runner.getOptionalFile('config/criteria.json')
     return file ? parseCriteria('config/criteria.json', file.text) : null
+  }
+
+  async readResume(): Promise<Resume | null> {
+    const file = await this.runner.getOptionalFile('config/resume.json')
+    return file ? parseResume('config/resume.json', file.text) : null
   }
 }

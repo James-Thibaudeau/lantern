@@ -14,7 +14,7 @@ pnpm cli init-runner my-lantern-runner
 
 That copies this folder to `../my-lantern-runner`, turns the example configs into real ones, and pushes it to a new private repo. Pushing workflow files needs the `workflow` scope on your `gh` token (`gh auth refresh -s workflow`).
 
-Then edit `config/companies.json`, `config/profiles.json` and `config/criteria.json`, commit, push, and try a run:
+Then edit `config/companies.json`, `config/profiles.json`, `config/criteria.json` and `config/resume.json`, commit, push, and try a run:
 
 ```bash
 gh workflow run run.yml -f dryRun=true
@@ -28,6 +28,7 @@ gh workflow run run.yml -f dryRun=true
 | `config/companies.json`     | Watchlist: `{ name, ats, slug, workday?: { tenant, host, site } }[]`                                       |
 | `config/profiles.json`      | Profiles for the early filter: `id`, `enabled`, `titleInclude[]`, `titleExclude[]`, `allowedEligibility[]` |
 | `config/criteria.json`      | Ranking for the app: `signals[]`, `dealbreakers[]`, `eligibility` points, `salary` floor                   |
+| `config/resume.json`        | Your master resume for tailoring: basics, summary, skill groups, jobs with bullet `id`s                    |
 
 ## Running
 
@@ -54,6 +55,10 @@ gh workflow run run.yml -f dryRun=true
 ### `criteria.json`
 
 Ranking for the Lantern app: weighted `signals`, `dealbreakers`, points per `eligibility` and an optional `salary` floor. It's read on your laptop, not in the Action, so it can change without a run. See "Ranking" in Lantern's README.
+
+### `resume.json`
+
+Your master resume, which the Lantern app tailors to each job on your laptop (never in the Action). Every job and bullet has an `id` (lowercase, digits, dashes) so a tailored bullet can point back at its original. Tailoring only selects, reorders and lightly rewords what's here, so keep it complete and accurate. See "Tailoring" in Lantern's README.
 
 ## Upgrading Lantern
 
