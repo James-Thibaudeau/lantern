@@ -1,7 +1,21 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { syncNow } from '#/server/jobs'
+import {
+  Badge,
+  Button,
+  Callout,
+  Notice,
+  PageHeader,
+  SectionTitle,
+  tableClass,
+  tableWrap,
+  tbodyClass,
+  tdClass,
+  theadClass,
+  thClass,
+  type BadgeTone,
+} from '#/components/ui'
 import { getRuns, runNow } from '#/server/runs'
 
 export const Route = createFileRoute('/runs')({
@@ -10,11 +24,11 @@ export const Route = createFileRoute('/runs')({
   component: RunsPage,
 })
 
-const OUTCOME_LABEL: Record<string, string> = {
-  synced: 'Synced',
-  no_artifact: 'Dry run',
-  expired: 'Expired',
-  superseded: 'Skipped (older)',
+const OUTCOME: Record<string, { label: string; tone: BadgeTone }> = {
+  synced: { label: 'Synced', tone: 'green' },
+  no_artifact: { label: 'Dry run', tone: 'neutral' },
+  expired: { label: 'Expired', tone: 'red' },
+  superseded: { label: 'Skipped (older)', tone: 'neutral' },
 }
 
 function formatTime(iso: string): string {
@@ -51,108 +65,88 @@ function RunsPage() {
   const hasGap = runs.some((r) => r.outcome === 'expired' || r.missing > 0)
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 text-zinc-900 dark:text-zinc-100">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-zinc-500">
-            <Link to="/" className="hover:underline">
-              Lantern
-            </Link>{' '}
-            /{' '}
-            <Link to="/jobs" className="hover:underline">
-              Jobs
-            </Link>{' '}
-            / Runs
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">Runs</h1>
-          {repo && <p className="mt-1 text-sm text-zinc-500">From {repo}</p>}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={fullResend}
-            disabled={busy}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-          >
-            Full resend
-          </button>
-          <button
-            type="button"
-            onClick={() => void act(() => syncNow())}
-            disabled={busy}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {busy ? 'Working…' : 'Sync'}
-          </button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
+      <PageHeader
+        title="Runs"
+        subtitle={repo ? `From ${repo}` : undefined}
+        actions={
+          <Button onClick={fullResend} disabled={busy}>
+            {busy ? 'Working…' : 'Full resend'}
+          </Button>
+        }
+      />
 
       {notice && (
-        <output
-          className={`mb-4 block text-sm ${notice.ok ? 'text-zinc-500' : 'text-red-700 dark:text-red-400'}`}
-        >
-          {notice.message}{' '}
-          {notice.url && (
-            <a href={notice.url} target="_blank" rel="noreferrer" className="underline">
-              Watch it on GitHub ↗
-            </a>
-          )}
-        </output>
+        <div className="mb-4">
+          <Notice ok={notice.ok}>
+            {notice.message}{' '}
+            {notice.url && (
+              <a href={notice.url} target="_blank" rel="noreferrer" className="underline">
+                Watch it on GitHub ↗
+              </a>
+            )}
+          </Notice>
+        </div>
       )}
       {hasGap && (
-        <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+        <Callout tone="warning">
           Some results were missed (an expired run, or jobs listed that aren't here). A full resend
           fixes it.
-        </p>
+        </Callout>
       )}
 
       <section className="mb-10">
-        <h2 className="mb-2 text-lg font-semibold">History</h2>
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-900">
+        <SectionTitle>History</SectionTitle>
+        <div className={tableWrap}>
+          <table className={tableClass}>
+            <thead className={theadClass}>
               <tr>
-                <th className="px-3 py-2 font-medium">Run</th>
-                <th className="px-3 py-2 font-medium">Result</th>
-                <th className="px-3 py-2 text-right font-medium">New</th>
-                <th className="px-3 py-2 text-right font-medium">Updated</th>
-                <th className="px-3 py-2 text-right font-medium">Closed</th>
-                <th className="px-3 py-2 text-right font-medium">Reopened</th>
-                <th className="px-3 py-2 text-right font-medium">Missing</th>
+                <th className={thClass}>Run</th>
+                <th className={thClass}>Result</th>
+                <th className={`${thClass} text-right`}>New</th>
+                <th className={`${thClass} text-right`}>Updated</th>
+                <th className={`${thClass} text-right`}>Closed</th>
+                <th className={`${thClass} text-right`}>Reopened</th>
+                <th className={`${thClass} text-right`}>Missing</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
-              {runs.map((r) => (
-                <tr key={r.runId}>
-                  <td className="px-3 py-2">
-                    {repo && /^\d+$/.test(r.runId) ? (
-                      <a
-                        href={`https://github.com/${repo}/actions/runs/${r.runId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="hover:underline"
-                      >
-                        {formatTime(r.runCreatedAt)}
-                      </a>
-                    ) : (
-                      formatTime(r.runCreatedAt)
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{OUTCOME_LABEL[r.outcome] ?? r.outcome}</td>
-                  <td className="px-3 py-2 text-right">{r.inserted}</td>
-                  <td className="px-3 py-2 text-right">{r.updated}</td>
-                  <td className="px-3 py-2 text-right">{r.closed}</td>
-                  <td className="px-3 py-2 text-right">{r.reopened}</td>
-                  <td
-                    className={`px-3 py-2 text-right ${r.missing ? 'font-medium text-amber-700' : ''}`}
-                  >
-                    {r.missing}
-                  </td>
-                </tr>
-              ))}
+            <tbody className={tbodyClass}>
+              {runs.map((r) => {
+                const outcome = OUTCOME[r.outcome]
+                return (
+                  <tr key={r.runId}>
+                    <td className={`${tdClass} whitespace-nowrap`}>
+                      {repo && /^\d+$/.test(r.runId) ? (
+                        <a
+                          href={`https://github.com/${repo}/actions/runs/${r.runId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {formatTime(r.runCreatedAt)}
+                        </a>
+                      ) : (
+                        formatTime(r.runCreatedAt)
+                      )}
+                    </td>
+                    <td className={tdClass}>
+                      <Badge tone={outcome?.tone ?? 'neutral'}>{outcome?.label ?? r.outcome}</Badge>
+                    </td>
+                    <td className={`${tdClass} text-right`}>{r.inserted}</td>
+                    <td className={`${tdClass} text-right`}>{r.updated}</td>
+                    <td className={`${tdClass} text-right`}>{r.closed}</td>
+                    <td className={`${tdClass} text-right`}>{r.reopened}</td>
+                    <td
+                      className={`${tdClass} text-right ${r.missing > 0 ? 'font-medium text-amber-700 dark:text-amber-400' : ''}`}
+                    >
+                      {r.missing}
+                    </td>
+                  </tr>
+                )
+              })}
               {runs.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
+                  <td colSpan={7} className="px-3 py-6 text-center text-muted">
                     No runs synced yet.
                   </td>
                 </tr>
@@ -163,38 +157,44 @@ function RunsPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold">Companies</h2>
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-900">
+        <SectionTitle>Companies</SectionTitle>
+        <div className={tableWrap}>
+          <table className={tableClass}>
+            <thead className={theadClass}>
               <tr>
-                <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 font-medium">Board</th>
-                <th className="px-3 py-2 font-medium">Last run</th>
-                <th className="px-3 py-2 text-right font-medium">Fetched</th>
-                <th className="px-3 py-2 text-right font-medium">Kept</th>
-                <th className="px-3 py-2 font-medium">Problem</th>
+                <th className={thClass}>Company</th>
+                <th className={thClass}>Board</th>
+                <th className={thClass}>Last run</th>
+                <th className={`${thClass} text-right`}>Fetched</th>
+                <th className={`${thClass} text-right`}>Kept</th>
+                <th className={thClass}>Problem</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
-              {companies.map((c) => (
-                <tr key={c.slug}>
-                  <td className="px-3 py-2">{c.name}</td>
-                  <td className="px-3 py-2 text-zinc-500">{c.ats}</td>
-                  <td className="px-3 py-2">
-                    {c.lastStatus === 'ok' ? (c.lastComplete ? 'OK' : 'Partial') : c.lastStatus}
-                  </td>
-                  <td className="px-3 py-2 text-right">{c.lastFetched}</td>
-                  <td className="px-3 py-2 text-right">{c.lastKept}</td>
-                  <td className="max-w-md truncate px-3 py-2 text-red-700 dark:text-red-400">
-                    {c.lastError ?? ''}
-                  </td>
-                </tr>
-              ))}
+            <tbody className={tbodyClass}>
+              {companies.map((c) => {
+                const label =
+                  c.lastStatus === 'ok' ? (c.lastComplete ? 'OK' : 'Partial') : c.lastStatus
+                const tone: BadgeTone =
+                  label === 'OK' ? 'green' : label === 'Partial' ? 'warning' : 'red'
+                return (
+                  <tr key={c.slug}>
+                    <td className={tdClass}>{c.name}</td>
+                    <td className={`${tdClass} text-muted`}>{c.ats}</td>
+                    <td className={tdClass}>
+                      <Badge tone={tone}>{label}</Badge>
+                    </td>
+                    <td className={`${tdClass} text-right`}>{c.lastFetched}</td>
+                    <td className={`${tdClass} text-right`}>{c.lastKept}</td>
+                    <td className={`${tdClass} max-w-md truncate text-red-700 dark:text-red-400`}>
+                      {c.lastError ?? ''}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

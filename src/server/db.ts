@@ -24,6 +24,12 @@ export interface SyncStatus {
 
 let running: Promise<SyncStatus> | undefined
 let startup: Promise<SyncStatus> | undefined
+let last: SyncStatus | undefined
+
+/** The most recent sync's result, or undefined before the first one finishes. */
+export function lastSyncStatus(): SyncStatus | undefined {
+  return last
+}
 
 function summarize(result: SyncResult): string {
   const synced = result.runs.filter((r) => r.outcome === 'synced')
@@ -108,7 +114,10 @@ export function runSync(): Promise<SyncStatus> {
     } finally {
       running = undefined
     }
-  })()
+  })().then((status) => {
+    last = status
+    return status
+  })
   return running
 }
 

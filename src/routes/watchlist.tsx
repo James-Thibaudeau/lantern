@@ -1,6 +1,23 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState, type FormEvent } from 'react'
 
+import {
+  Badge,
+  Button,
+  Callout,
+  EmptyState,
+  Notice,
+  PageHeader,
+  SectionTitle,
+  inputClass,
+  tableClass,
+  tableWrap,
+  tbodyClass,
+  tdClass,
+  theadClass,
+  thClass,
+  type BadgeTone,
+} from '#/components/ui'
 import {
   acceptSuggestion,
   detectUrl,
@@ -23,11 +40,6 @@ const VIA_LABEL: Record<SuggestionView['via'], string> = {
   page: 'found on site',
   guess: 'guessed: check it',
 }
-
-const button =
-  'rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900'
-const primaryButton =
-  'rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900'
 
 function WatchlistPage() {
   const { repo, watchlist, suggestions, configError } = Route.useLoaderData()
@@ -61,39 +73,24 @@ function WatchlistPage() {
   const unsupported = suggestions.filter((s) => !s.supported)
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 text-zinc-900 dark:text-zinc-100">
-      <header className="mb-6">
-        <p className="text-sm text-zinc-500">
-          <Link to="/" className="hover:underline">
-            Lantern
-          </Link>{' '}
-          /{' '}
-          <Link to="/jobs" className="hover:underline">
-            Jobs
-          </Link>{' '}
-          / Watchlist
-        </p>
-        <h1 className="text-3xl font-bold tracking-tight">Watchlist</h1>
-        {repo && <p className="mt-1 text-sm text-zinc-500">Stored in {repo}</p>}
-      </header>
+    <div className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
+      <PageHeader title="Watchlist" subtitle={repo ? `Stored in ${repo}` : undefined} />
 
       {configError && (
-        <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-200">
+        <Callout tone="error">
           Couldn’t read your watchlist: {configError} The watchlist needs the token’s{' '}
           <strong>Contents: Read and write</strong> permission.
-        </p>
+        </Callout>
       )}
       {notice && (
-        <output
-          className={`mb-4 block text-sm ${notice.ok ? 'text-zinc-500' : 'text-red-700 dark:text-red-400'}`}
-        >
-          {notice.message}
-        </output>
+        <div className="mb-4">
+          <Notice ok={notice.ok}>{notice.message}</Notice>
+        </div>
       )}
 
       <section className="mb-10">
-        <h2 className="mb-2 text-lg font-semibold">Add a company</h2>
-        <form onSubmit={onDetect} className="flex flex-wrap gap-2">
+        <SectionTitle>Add a company</SectionTitle>
+        <form onSubmit={onDetect} className="flex gap-2">
           <input
             type="url"
             required
@@ -101,40 +98,36 @@ function WatchlistPage() {
             placeholder="Paste a job posting or careers page URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="min-w-72 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className={`${inputClass} min-w-0 flex-1`}
           />
-          <button type="submit" disabled={busy !== null} className={primaryButton}>
+          <Button type="submit" variant="primary" disabled={busy !== null}>
             {busy === 'detect' ? 'Checking…' : 'Find board'}
-          </button>
+          </Button>
         </form>
       </section>
 
       <section className="mb-10">
-        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg font-semibold">Suggestions</h2>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void act('hn', () => mineHn())}
-            className={button}
-          >
-            {busy === 'hn' ? 'Checking HN… (about a minute)' : 'Check HN “Who is hiring?”'}
-          </button>
-        </div>
-        <p className="mb-3 text-sm text-zinc-500">
+        <SectionTitle
+          actions={
+            <Button disabled={busy !== null} onClick={() => void act('hn', () => mineHn())}>
+              {busy === 'hn' ? 'Checking HN… (about a minute)' : 'Check HN “Who is hiring?”'}
+            </Button>
+          }
+        >
+          Suggestions
+        </SectionTitle>
+        <p className="mb-3 text-sm text-muted">
           Sorted by how many of their open jobs pass your profile today. “Guessed” boards were found
           by trying the company name, so open the board to make sure it’s the right company.
         </p>
         {suggestions.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
-            No suggestions waiting. Check HN, or add a company above.
-          </p>
+          <EmptyState title="No suggestions waiting">Check HN, or add a company above.</EmptyState>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
             {[...supported, ...unsupported].map((s) => (
               <li
                 key={s.id}
-                className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${highlight.includes(s.id) ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}
+                className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${highlight.includes(s.id) ? 'bg-accent-50 dark:bg-accent-500/10' : ''}`}
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
@@ -145,19 +138,20 @@ function WatchlistPage() {
                     ) : (
                       s.name
                     )}
-                    <span className="ml-2 text-sm font-normal text-zinc-500">
+                    <span className="ml-2 text-sm font-normal text-muted">
                       {s.ats}/{s.slug}
                     </span>
                     {s.supported && (
-                      <span
-                        className={`ml-2 rounded-full px-2 py-0.5 align-middle text-xs ${s.via === 'guess' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}
+                      <Badge
+                        tone={s.via === 'guess' ? 'warning' : 'neutral'}
+                        className="ml-2 align-middle"
                       >
                         {VIA_LABEL[s.via]}
-                      </span>
+                      </Badge>
                     )}
                   </p>
                   {s.sourceText && (
-                    <p className="truncate text-sm text-zinc-500">
+                    <p className="truncate text-sm text-muted">
                       {s.source === 'hn' && s.sourceUrl ? (
                         <a
                           href={s.sourceUrl}
@@ -173,39 +167,38 @@ function WatchlistPage() {
                     </p>
                   )}
                 </div>
-                <p className="w-40 text-right text-sm tabular-nums">
+                <p className="text-sm tabular-nums sm:w-40 sm:text-right">
                   {!s.supported ? (
-                    <span className="text-zinc-500">{s.note ?? 'Not supported'}</span>
+                    <span className="text-muted">{s.note ?? 'Not supported'}</span>
                   ) : s.checkError ? (
                     <span className="text-red-700 dark:text-red-400">Check failed</span>
                   ) : (
                     <>
                       <strong>{s.matchingJobs ?? 0}</strong> matching
-                      <span className="text-zinc-500"> of {s.openJobs ?? 0}</span>
+                      <span className="text-muted"> of {s.openJobs ?? 0}</span>
                     </>
                   )}
                 </p>
                 <div className="flex gap-2">
                   {s.supported && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="sm"
                       disabled={busy !== null}
                       onClick={() => void act(s.id, () => acceptSuggestion({ data: { id: s.id } }))}
-                      className={primaryButton}
                     >
                       {busy === s.id ? 'Adding…' : 'Accept'}
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
                     disabled={busy !== null}
                     onClick={() =>
                       void act(`r:${s.id}`, () => rejectSuggestion({ data: { id: s.id } }))
                     }
-                    className={button}
                   >
                     {s.supported ? 'Reject' : 'Dismiss'}
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
@@ -214,52 +207,69 @@ function WatchlistPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold">
+        <SectionTitle>
           Watching {watchlist.length} {watchlist.length === 1 ? 'company' : 'companies'}
-        </h2>
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-900">
+        </SectionTitle>
+        <div className={tableWrap}>
+          <table className={tableClass}>
+            <thead className={theadClass}>
               <tr>
-                <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 font-medium">Board</th>
-                <th className="px-3 py-2 font-medium">Last run</th>
-                <th className="px-3 py-2 text-right font-medium">Open</th>
-                <th className="px-3 py-2 text-right font-medium">Matching</th>
+                <th className={thClass}>Company</th>
+                <th className={thClass}>Board</th>
+                <th className={thClass}>Last run</th>
+                <th className={`${thClass} text-right`}>Open</th>
+                <th className={`${thClass} text-right`}>Matching</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
-              {watchlist.map((c) => (
-                <tr key={`${c.ats}:${c.slug}`}>
-                  <td className="px-3 py-2">
-                    {c.url ? (
-                      <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
-                        {c.name}
-                      </a>
-                    ) : (
-                      c.name
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-zinc-500">
-                    {c.ats}/{c.slug}
-                  </td>
-                  <td className="px-3 py-2">
-                    {c.lastStatus === null
-                      ? 'Not run yet'
-                      : c.lastStatus === 'ok'
-                        ? c.lastComplete
-                          ? 'OK'
-                          : 'Partial'
-                        : c.lastStatus}
-                  </td>
-                  <td className="px-3 py-2 text-right">{c.lastFetched ?? '—'}</td>
-                  <td className="px-3 py-2 text-right">{c.lastKept ?? '—'}</td>
-                </tr>
-              ))}
+            <tbody className={tbodyClass}>
+              {watchlist.map((c) => {
+                const label =
+                  c.lastStatus === null
+                    ? 'Not run yet'
+                    : c.lastStatus === 'ok'
+                      ? c.lastComplete
+                        ? 'OK'
+                        : 'Partial'
+                      : c.lastStatus
+                const tone: BadgeTone =
+                  c.lastStatus === null
+                    ? 'neutral'
+                    : label === 'OK'
+                      ? 'green'
+                      : label === 'Partial'
+                        ? 'warning'
+                        : 'red'
+                return (
+                  <tr key={`${c.ats}:${c.slug}`}>
+                    <td className={tdClass}>
+                      {c.url ? (
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {c.name}
+                        </a>
+                      ) : (
+                        c.name
+                      )}
+                    </td>
+                    <td className={`${tdClass} text-muted`}>
+                      {c.ats}/{c.slug}
+                    </td>
+                    <td className={tdClass}>
+                      <Badge tone={tone}>{label}</Badge>
+                    </td>
+                    <td className={`${tdClass} text-right`}>{c.lastFetched ?? '—'}</td>
+                    <td className={`${tdClass} text-right`}>{c.lastKept ?? '—'}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

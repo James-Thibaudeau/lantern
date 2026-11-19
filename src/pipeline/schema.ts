@@ -36,6 +36,14 @@ export const ELIGIBILITY_LABEL: Record<Eligibility, string> = {
   non_canada_onsite: 'On-site · outside Canada',
 }
 
+/**
+ * Your decision about a job, stored only locally (sync never changes it). `new` is the
+ * inbox; a dismissed job stays dismissed even if it closes and reopens.
+ */
+export const JOB_STATUS = ['new', 'interested', 'applied', 'dismissed'] as const
+export const JobStatusSchema = z.enum(JOB_STATUS)
+export type JobStatus = z.infer<typeof JobStatusSchema>
+
 export const ProfileSchema = z.object({
   id: z.string().min(1),
   enabled: z.boolean(),

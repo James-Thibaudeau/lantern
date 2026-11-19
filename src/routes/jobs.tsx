@@ -1,20 +1,46 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 
+import { formatDate } from '#/components/jobs/format'
+import { JobDetail } from '#/components/jobs/JobDetail'
+import { JobList } from '#/components/jobs/JobList'
+import { Callout, EmptyState, inputClass } from '#/components/ui'
 import {
   ELIGIBILITY,
   ELIGIBILITY_LABEL,
   EligibilitySchema,
-  type Eligibility,
-  type Salary,
+  type JobStatus,
 } from '#/pipeline/schema'
-import { getJobs, syncNow, type JobRow } from '#/server/jobs'
-import { runNow } from '#/server/runs'
+import { getJobs, setJobStatus, type JobRow } from '#/server/jobs'
 
-// Filters live in the URL (?eligibility=…&company=…&q=…), so a filtered view can be
-// bookmarked or shared, and the back button undoes a filter change.
+const TABS = ['inbox', 'interested', 'applied', 'dismissed'] as const
+type Tab = (typeof TABS)[number]
+
+const TAB_STATUS: Record<Tab, JobStatus> = {
+  inbox: 'new',
+  interested: 'interested',
+  applied: 'applied',
+  dismissed: 'dismissed',
+}
+const TAB_LABEL: Record<Tab, string> = {
+  inbox: 'Inbox',
+  interested: 'Interested',
+  applied: 'Applied',
+  dismissed: 'Dismissed',
+}
+const TAB_EMPTY: Record<Tab, string> = {
+  inbox: 'Inbox zero. New jobs land here after each sync.',
+  interested: 'Nothing marked Interested yet. Select a job and press I.',
+  applied: 'Nothing marked Applied yet. Select a job and press A.',
+  dismissed: 'Nothing dismissed. Dismissed jobs never come back to the inbox.',
+}
+
+// Filters, the tab and the selected job live in the URL, so a view can be bookmarked and the
+// back button undoes a change.
 const JobsSearch = z.object({
+  tab: z.enum(TABS).optional().catch(undefined),
+  job: z.string().optional().catch(undefined),
   eligibility: z.enum(ELIGIBILITY).optional().catch(undefined),
   company: z.string().optional().catch(undefined),
   q: z.string().optional().catch(undefined),
@@ -26,50 +52,14 @@ type JobsSearch = z.infer<typeof JobsSearch>
 
 export const Route = createFileRoute('/jobs')({
   validateSearch: (search) => JobsSearch.parse(search),
-  // The loader runs before the page renders: on the server for the first load,
-  // and through the server function's HTTP endpoint on later client-side visits.
-  // loaderDeps picks the search params the loader depends on, so toggling "show closed"
-  // reloads data, while the other filters (applied in the browser) don't.
+  // The loader runs before the page renders: on the server for the first load, and through
+  // the server function's HTTP endpoint later. Only "show closed" changes what's loaded; the
+  // other filters apply in the browser.
   loaderDeps: ({ search }) => ({ closed: search.closed ?? false }),
   loader: ({ deps }) => getJobs({ data: deps }),
   head: () => ({ meta: [{ title: 'Jobs · Lantern' }] }),
   component: JobsPage,
 })
-
-const ELIGIBILITY_STYLE: Record<Eligibility, string> = {
-  remote_canada_ok: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  canada_hybrid: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  canada_onsite: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
-  unknown: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  remote_us_only: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  remote_non_canada: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  non_canada_onsite: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-}
-
-function formatSalary(s: Salary | null): string {
-  if (!s || (s.min == null && s.max == null)) return '—'
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('en-CA', {
-      style: s.currency ? 'currency' : 'decimal',
-      currency: s.currency ?? undefined,
-      notation: n >= 10_000 ? 'compact' : 'standard',
-      maximumFractionDigits: n >= 10_000 ? 0 : 2,
-    }).format(n)
-  const range =
-    s.min != null && s.max != null && s.min !== s.max
-      ? `${fmt(s.min)}–${fmt(s.max)}`
-      : fmt((s.min ?? s.max)!)
-  return s.period ? `${range} / ${s.period}` : range
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-CA', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
 
 function matches(job: JobRow, search: JobsSearch): boolean {
   if (search.eligibility && job.eligibility !== search.eligibility) return false
@@ -91,45 +81,47 @@ function byScore(a: JobRow, b: JobRow): number {
   return (b.score ?? 0) - (a.score ?? 0)
 }
 
-const points = (n: number) => (n > 0 ? `+${n}` : `−${Math.abs(n)}`)
+function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))
+  )
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function JobsPage() {
-  const { jobs, lastRun, sync, ranking } = Route.useLoaderData()
+  const { jobs: loaded, lastRun, ranking } = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
-  const [busy, setBusy] = useState<'sync' | 'run' | null>(null)
-  const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null)
-  const status = notice ?? sync
+  // Status changes show at once. They're tied to the loaded data they were made on, so fresh
+  // loader data (which has them saved) replaces them.
+  const [pending, setPending] = useState<{ on: JobRow[]; status: Record<string, JobStatus> }>({
+    on: loaded,
+    status: {},
+  })
+  const [error, setError] = useState<string | null>(null)
+  const jobs = useMemo(() => {
+    const status = pending.on === loaded ? pending.status : {}
+    return loaded.map((j) => (status[j.id] ? { ...j, status: status[j.id] } : j))
+  }, [loaded, pending])
 
-  async function onSync() {
-    setBusy('sync')
-    try {
-      setNotice(await syncNow())
-      await router.invalidate() // re-runs the loader to show the synced jobs
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function onRunNow() {
-    setBusy('run')
-    try {
-      setNotice(await runNow({ data: { fullResend: false } }))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  // "New" = first seen within a day of the latest run.
-  const newSince = lastRun ? new Date(lastRun.at).getTime() - DAY_MS : Infinity
-
-  const setSearch = (patch: Partial<JobsSearch>) => {
+  const tab = search.tab ?? 'inbox'
+  const sort = ranking.ranked ? (search.sort ?? 'score') : 'newest'
+  const setSearch = (patch: Partial<JobsSearch>, replace = true) => {
     // navigate() returns a promise; filter changes don't need to wait for it.
-    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true })
+    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace })
   }
+
+  const counts = useMemo(() => {
+    const c: Record<Tab, number> = { inbox: 0, interested: 0, applied: 0, dismissed: 0 }
+    for (const j of jobs) {
+      const t = TABS.find((x) => TAB_STATUS[x] === j.status)
+      if (t && matches(j, search)) c[t]++
+    }
+    return c
+  }, [jobs, search])
 
   const companies = useMemo(
     () =>
@@ -142,274 +134,255 @@ function JobsPage() {
     () => ELIGIBILITY.filter((e) => jobs.some((j) => j.eligibility === e)),
     [jobs],
   )
-  const sort = ranking.ranked ? (search.sort ?? 'score') : 'newest'
   const visible = useMemo(() => {
-    const kept = jobs.filter((j) => matches(j, search))
+    const kept = jobs.filter((j) => j.status === TAB_STATUS[tab] && matches(j, search))
     return sort === 'score' ? kept.toSorted(byScore) : kept
-  }, [jobs, search, sort])
-  const filtered = Boolean(search.eligibility || search.company || search.q)
+  }, [jobs, search, sort, tab])
 
-  return (
-    <main className="mx-auto max-w-6xl px-4 py-8 text-zinc-900 dark:text-zinc-100">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-zinc-500">
-            <Link to="/" className="hover:underline">
-              Lantern
-            </Link>{' '}
-            / Jobs
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
-          {lastRun && (
-            <p className="mt-1 text-sm text-zinc-500">
-              Last run {formatDate(lastRun.at)}
-              {lastRun.totals &&
-                ` · ${lastRun.totals.ok}/${lastRun.totals.companies} companies · ${lastRun.totals.fetched} fetched · ${lastRun.totals.kept} kept`}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link to="/watchlist" className="text-sm text-zinc-500 hover:underline">
-            Watchlist
-          </Link>
-          <Link to="/runs" className="text-sm text-zinc-500 hover:underline">
-            Runs
-          </Link>
-          <button
-            type="button"
-            onClick={() => void onRunNow()}
-            disabled={busy !== null}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-          >
-            {busy === 'run' ? 'Starting…' : 'Run now'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void onSync()}
-            disabled={busy !== null}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {busy === 'sync' ? 'Syncing…' : 'Sync'}
-          </button>
-        </div>
-      </header>
+  // On wide screens something is always selected; on phones the detail opens only for a job
+  // chosen in the URL.
+  const chosen = visible.find((j) => j.id === search.job) ?? null
+  const selected = chosen ?? visible[0] ?? null
+  const detailOpen = chosen !== null
 
-      <output
-        className={`mb-4 block text-sm ${status.ok ? 'text-zinc-500' : 'text-red-700 dark:text-red-400'}`}
-      >
-        {status.message}
-      </output>
-      {/* Quiet when ranking works; otherwise say why the list isn't ranked. */}
-      {(!ranking.ok || !ranking.ranked) && (
-        <p
-          className={`-mt-3 mb-4 text-sm ${ranking.ok ? 'text-zinc-500' : 'text-red-700 dark:text-red-400'}`}
-        >
-          {ranking.message}
-        </p>
-      )}
+  // "New" = first seen within a day of the latest run.
+  const newSince = lastRun ? new Date(lastRun.at).getTime() - DAY_MS : Infinity
+  const isNew = (j: JobRow) => new Date(j.firstSeenAt).getTime() >= newSince && !j.closedAt
 
-      {jobs.length === 0 && !lastRun ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-          <p className="font-medium">No jobs yet</p>
-          <p className="mt-2 text-sm text-zinc-500">
+  const select = (id: string | undefined, replace = false) => setSearch({ job: id }, replace)
+
+  async function changeStatus(job: JobRow, status: Exclude<JobStatus, 'new'>) {
+    const next: JobStatus = job.status === status ? 'new' : status
+    if (next !== TAB_STATUS[tab]) {
+      // The job leaves this tab: select its neighbour, like archiving in a mail app.
+      const i = visible.findIndex((j) => j.id === job.id)
+      select((visible[i + 1] ?? visible[i - 1])?.id, true)
+    }
+    setError(null)
+    setPending((p) => ({
+      on: loaded,
+      status: { ...(p.on === loaded ? p.status : {}), [job.id]: next },
+    }))
+    try {
+      const r = await setJobStatus({ data: { id: job.id, status: next } })
+      if (!r.ok) setError(r.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+    await router.invalidate() // also refreshes the sidebar's inbox count
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return
+      const i = selected ? visible.findIndex((j) => j.id === selected.id) : -1
+      if (e.key === 'j' || e.key === 'k') {
+        const next =
+          visible[e.key === 'j' ? Math.min(i + 1, visible.length - 1) : Math.max(i - 1, 0)]
+        if (next) select(next.id, true)
+      } else if (selected && (e.key === 'i' || e.key === 'a' || e.key === 'x')) {
+        const status = e.key === 'i' ? 'interested' : e.key === 'a' ? 'applied' : 'dismissed'
+        void changeStatus(selected, status)
+      } else if (selected && e.key === 'o') {
+        window.open(selected.url, '_blank', 'noopener')
+      } else if (e.key === 'Escape' && detailOpen) {
+        select(undefined)
+      } else {
+        return
+      }
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  if (loaded.length === 0 && !lastRun) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16">
+        <EmptyState title="No jobs yet">
+          <p>
             Set <code>LANTERN_RUNNER_REPO</code> in <code>.env</code> and press Sync, or load a
             local ingest:
           </p>
-          <pre className="mt-3 inline-block rounded bg-zinc-100 px-3 py-2 text-left text-sm dark:bg-zinc-800">
+          <pre className="mt-3 inline-block rounded-md bg-sunken px-3 py-2 text-left text-xs">
             pnpm cli ingest --config ../lantern-runner/config --out out/{'\n'}pnpm sync --from out/
           </pre>
+        </EmptyState>
+      </div>
+    )
+  }
+
+  const filtered = Boolean(search.eligibility || search.company || search.q)
+
+  return (
+    <div className="flex h-full flex-col">
+      <div
+        className={`border-b border-line bg-surface px-4 pt-5 md:px-6 ${detailOpen ? 'hidden md:block' : ''}`}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
+          {lastRun && (
+            <p className="text-xs text-muted">
+              Last run {formatDate(lastRun.at)}
+              {lastRun.totals &&
+                ` · ${lastRun.totals.ok}/${lastRun.totals.companies} companies · ${lastRun.totals.kept} kept`}
+            </p>
+          )}
         </div>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap gap-3">
-            <input
-              type="search"
-              aria-label="Search jobs"
-              placeholder="Search title, company, location"
-              defaultValue={search.q ?? ''}
-              onChange={(e) => setSearch({ q: e.target.value || undefined })}
-              className="min-w-64 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            <select
-              aria-label="Filter by location"
-              value={search.eligibility ?? ''}
-              onChange={(e) =>
-                setSearch({ eligibility: EligibilitySchema.safeParse(e.target.value).data })
-              }
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="">All locations</option>
-              {eligibilities.map((e) => (
-                <option key={e} value={e}>
-                  {ELIGIBILITY_LABEL[e]}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Filter by company"
-              value={search.company ?? ''}
-              onChange={(e) => setSearch({ company: e.target.value || undefined })}
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="">All companies</option>
-              {companies.map(([slug, name]) => (
-                <option key={slug} value={slug}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            {ranking.ranked && (
-              <select
-                aria-label="Sort jobs"
-                value={sort}
-                onChange={(e) =>
-                  setSearch({ sort: e.target.value === 'newest' ? 'newest' : undefined })
-                }
-                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              >
-                <option value="score">Best match</option>
-                <option value="newest">Newest</option>
-              </select>
-            )}
-            <label className="flex items-center gap-2 self-center text-sm text-zinc-600 dark:text-zinc-400">
-              <input
-                type="checkbox"
-                checked={search.closed ?? false}
-                onChange={(e) => setSearch({ closed: e.target.checked || undefined })}
-              />
-              Show closed
-            </label>
-            {filtered && (
-              <Link
-                to="/jobs"
-                search={{}}
-                className="self-center text-sm text-zinc-500 hover:underline"
-              >
-                Clear filters
-              </Link>
-            )}
-          </div>
-
-          <p className="mb-2 text-sm text-zinc-500">
-            {visible.length} of {jobs.length} jobs
+        {(!ranking.ok || !ranking.ranked) && (
+          <p
+            className={`mt-1 text-xs ${ranking.ok ? 'text-muted' : 'text-red-700 dark:text-red-400'}`}
+          >
+            {ranking.message}
           </p>
+        )}
 
-          <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-            {visible.map((job) => (
-              <li key={job.id} className={job.dealbreaker ? 'opacity-60' : undefined}>
-                <details className="group">
-                  {/* The summary's label is the job title and company inside it; the rule
-                      only looks at direct text. */}
-                  {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label */}
-                  <summary className="grid cursor-pointer list-none gap-x-4 gap-y-1 px-4 py-3 hover:bg-zinc-50 sm:grid-cols-[1fr_auto] dark:hover:bg-zinc-900">
-                    <div className="flex min-w-0 gap-3">
-                      {job.score !== null && (
-                        <span
-                          title="Match score: open the job to see why"
-                          className="mt-0.5 h-fit w-9 shrink-0 rounded-md bg-zinc-100 py-0.5 text-center text-xs font-semibold text-zinc-800 tabular-nums dark:bg-zinc-800 dark:text-zinc-200"
-                        >
-                          {job.score}
-                        </span>
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-medium">
-                          {job.title}
-                          {new Date(job.firstSeenAt).getTime() >= newSince && !job.closedAt && (
-                            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                              New
-                            </span>
-                          )}
-                          {job.closedAt && (
-                            <span className="ml-2 rounded-full bg-zinc-200 px-2 py-0.5 align-middle text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                              Closed {formatDate(job.closedAt)}
-                            </span>
-                          )}
-                          {job.dealbreaker && (
-                            <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 align-middle text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
-                              {job.dealbreaker}
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-sm text-zinc-500">
-                          {job.company} · {job.locationText || 'No location'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-sm sm:justify-end">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${ELIGIBILITY_STYLE[job.eligibility]}`}
-                      >
-                        {ELIGIBILITY_LABEL[job.eligibility]}
-                      </span>
-                      <span className="text-zinc-600 tabular-nums dark:text-zinc-400">
-                        {formatSalary(job.salary)}
-                      </span>
-                      <span className="w-24 text-right text-zinc-500 tabular-nums">
-                        {formatDate(job.postedAt)}
-                      </span>
-                    </div>
-                  </summary>
-                  <div className="border-t border-zinc-100 bg-zinc-50/60 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-                    <div className="mb-3 flex gap-4 text-sm">
-                      <a
-                        href={job.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium text-sky-700 hover:underline dark:text-sky-400"
-                      >
-                        View posting ↗
-                      </a>
-                      {job.applyUrl && job.applyUrl !== job.url && (
-                        <a
-                          href={job.applyUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sky-700 hover:underline dark:text-sky-400"
-                        >
-                          Apply ↗
-                        </a>
-                      )}
-                      <span className="text-zinc-500">
-                        via {job.source} · first seen {formatDate(job.firstSeenAt)}
-                      </span>
-                    </div>
-                    {job.score !== null && (
-                      <ul
-                        aria-label="Why this score"
-                        className="mb-3 flex flex-wrap gap-1.5 text-xs"
-                      >
-                        {job.reasons.map((r) => (
-                          <li
-                            key={r.label}
-                            className={`rounded-full px-2 py-0.5 font-medium tabular-nums ${
-                              r.points > 0
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-                            }`}
-                          >
-                            {points(r.points)} {r.label}
-                          </li>
-                        ))}
-                        {job.reasons.length === 0 && (
-                          <li className="text-zinc-500">No criteria matched this job.</li>
-                        )}
-                      </ul>
-                    )}
-                    <p className="max-h-96 overflow-y-auto text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">
-                      {job.descriptionText}
-                    </p>
-                  </div>
-                </details>
-              </li>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            aria-label="Search jobs"
+            placeholder="Search title, company, location"
+            defaultValue={search.q ?? ''}
+            onChange={(e) => setSearch({ q: e.target.value || undefined })}
+            className={`min-w-0 flex-1 basis-48 ${inputClass}`}
+          />
+          <select
+            aria-label="Filter by location"
+            value={search.eligibility ?? ''}
+            onChange={(e) =>
+              setSearch({ eligibility: EligibilitySchema.safeParse(e.target.value).data })
+            }
+            className={`min-w-0 ${inputClass}`}
+          >
+            <option value="">All locations</option>
+            {eligibilities.map((e) => (
+              <option key={e} value={e}>
+                {ELIGIBILITY_LABEL[e]}
+              </option>
             ))}
-            {visible.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-zinc-500">
-                No jobs match these filters.
-              </li>
-            )}
-          </ul>
-        </>
+          </select>
+          <select
+            aria-label="Filter by company"
+            value={search.company ?? ''}
+            onChange={(e) => setSearch({ company: e.target.value || undefined })}
+            className={`min-w-0 ${inputClass}`}
+          >
+            <option value="">All companies</option>
+            {companies.map(([slug, name]) => (
+              <option key={slug} value={slug}>
+                {name}
+              </option>
+            ))}
+          </select>
+          {ranking.ranked && (
+            <select
+              aria-label="Sort jobs"
+              value={sort}
+              onChange={(e) =>
+                setSearch({ sort: e.target.value === 'newest' ? 'newest' : undefined })
+              }
+              className={`min-w-0 ${inputClass}`}
+            >
+              <option value="score">Best match</option>
+              <option value="newest">Newest</option>
+            </select>
+          )}
+          <label className="flex items-center gap-1.5 text-sm text-muted">
+            <input
+              type="checkbox"
+              className="accent-accent-600"
+              checked={search.closed ?? false}
+              onChange={(e) => setSearch({ closed: e.target.checked || undefined })}
+            />
+            Closed
+          </label>
+          {filtered && (
+            <button
+              type="button"
+              onClick={() =>
+                setSearch({ q: undefined, eligibility: undefined, company: undefined })
+              }
+              className="text-sm text-muted hover:text-ink hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <nav aria-label="Job status" className="mt-3 -mb-px flex gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-current={t === tab ? 'page' : undefined}
+              onClick={() =>
+                setSearch({ tab: t === 'inbox' ? undefined : t, job: undefined }, false)
+              }
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap ${
+                t === tab
+                  ? 'border-accent-500 font-medium text-ink'
+                  : 'border-transparent text-muted hover:text-ink'
+              }`}
+            >
+              {TAB_LABEL[t]}
+              <span
+                className={`rounded-full px-1.5 text-xs tabular-nums ${t === tab ? 'bg-accent-500/15 text-accent-800 dark:text-accent-300' : 'bg-sunken'}`}
+              >
+                {counts[t]}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {error && (
+        <div className="px-4 pt-3 md:px-6">
+          <Callout tone="error">Couldn’t save that change: {error}</Callout>
+        </div>
       )}
-    </main>
+
+      <div className="flex min-h-0 flex-1">
+        <section
+          aria-label={`${TAB_LABEL[tab]} jobs`}
+          className={`w-full shrink-0 overflow-y-auto border-line bg-surface md:w-[22rem] md:border-r lg:w-[26rem] ${detailOpen ? 'hidden md:block' : ''}`}
+        >
+          {visible.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-muted">
+              {filtered ? 'No jobs match these filters.' : TAB_EMPTY[tab]}
+            </p>
+          ) : (
+            <JobList
+              jobs={visible}
+              selectedId={selected?.id ?? null}
+              isNew={isNew}
+              onSelect={(id) => select(id)}
+            />
+          )}
+        </section>
+
+        <section
+          aria-label="Job details"
+          className={`min-w-0 flex-1 overflow-y-auto ${detailOpen ? '' : 'hidden md:block'}`}
+        >
+          {selected ? (
+            <JobDetail
+              key={selected.id}
+              job={selected}
+              onStatus={(s) => void changeStatus(selected, s)}
+              onBack={() => select(undefined)}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center p-8 text-sm text-muted">
+              Nothing to show here.
+            </div>
+          )}
+          {selected && (
+            <p className="hidden px-8 pb-6 text-xs text-muted lg:block">
+              Keys: J / K to move · I interested · A applied · X dismiss · O open posting
+            </p>
+          )}
+        </section>
+      </div>
+    </div>
   )
 }

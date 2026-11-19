@@ -2,11 +2,19 @@ import { createServerFn } from '@tanstack/react-start'
 import { desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { setJobStatus as updateJobStatus } from '#/db/jobs'
 import { ingestRuns, jobs, type JobRowDb } from '#/db/schema'
-import { EligibilitySchema, SalarySchema, type Eligibility, type Salary } from '#/pipeline/schema'
+import {
+  EligibilitySchema,
+  JobStatusSchema,
+  SalarySchema,
+  type Eligibility,
+  type JobStatus,
+  type Salary,
+} from '#/pipeline/schema'
 import type { JobScore, Reason, ScorableJob } from '#/rank/score'
 
-import { getDb, rankingStatus, runSync, startupSync, type SyncStatus } from './db'
+import { getDb, rankingStatus, runSync, startupSync } from './db'
 
 /** What the jobs page needs per job (everything except the heavy HTML description). */
 export interface JobRow {
@@ -24,6 +32,7 @@ export interface JobRow {
   postedAt: string | null
   firstSeenAt: string
   closedAt: string | null
+  status: JobStatus
   /** Null when there are no ranking criteria. */
   score: number | null
   reasons: Reason[]
@@ -42,8 +51,6 @@ const RunTotals = z.object({
 export interface JobsData {
   jobs: JobRow[]
   lastRun: { runId: string; at: string; totals: z.infer<typeof RunTotals>['totals'] | null } | null
-  /** Result of the sync that runs when the app starts (or the latest Sync click). */
-  sync: SyncStatus
   /** Whether jobs are ranked, and with what criteria (one line for the UI). */
   ranking: { ranked: boolean; ok: boolean; message: string }
 }
@@ -71,6 +78,7 @@ function toRow(j: JobRowDb, score: ((job: ScorableJob) => JobScore) | null): Job
     postedAt: j.postedAt,
     firstSeenAt: j.firstSeenAt,
     closedAt: j.closedAt,
+    status: JobStatusSchema.catch('new').parse(j.status),
     score: s?.score ?? null,
     reasons: s?.reasons ?? [],
     dealbreaker: s?.dealbreaker ?? null,
@@ -85,7 +93,7 @@ export const getJobs = createServerFn({ method: 'GET' })
   .validator((input: unknown) => z.object({ closed: z.boolean() }).parse(input))
   .handler(async ({ data }): Promise<JobsData> => {
     // The first page load after the app starts waits for a sync, so it shows fresh data.
-    const status = await startupSync()
+    await startupSync()
     const db = getDb()
 
     const rows = db
@@ -115,10 +123,20 @@ export const getJobs = createServerFn({ method: 'GET' })
     return {
       jobs: rows.map((j) => toRow(j, ranking.score)),
       lastRun: latest ? { runId: latest.runId, at: latest.at, totals } : null,
-      sync: status,
       ranking: { ranked: ranking.score !== null, ok: ranking.ok, message: ranking.message },
     }
   })
 
 /** The Sync button. */
 export const syncNow = createServerFn({ method: 'POST' }).handler(() => runSync())
+
+const SetStatusInput = z.object({ id: z.string().min(1), status: JobStatusSchema })
+
+/** Interested / Applied / Dismiss (and back to the inbox). */
+export const setJobStatus = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => SetStatusInput.parse(input))
+  .handler(({ data }): { ok: boolean; message: string } =>
+    updateJobStatus(getDb(), data.id, data.status)
+      ? { ok: true, message: 'Saved.' }
+      : { ok: false, message: 'That job is no longer in the database. Try Sync.' },
+  )
