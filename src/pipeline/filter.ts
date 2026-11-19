@@ -1,19 +1,9 @@
 import type { Job, Profile } from './schema'
+import { phraseMatcher } from './text'
 
 export type FilterResult =
   | { keep: true; profileIds: string[] }
   | { keep: false; reason: 'title' | 'eligibility' }
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-/** Whole-word, case-insensitive phrase match, so "intern" doesn't match "International". */
-function phraseMatcher(phrases: string[]): (title: string) => boolean {
-  if (phrases.length === 0) return () => false
-  const re = new RegExp(`(?<![a-z0-9])(${phrases.map(escapeRegex).join('|')})(?![a-z0-9])`, 'i')
-  return (title) => re.test(title)
-}
 
 /**
  * The early filter that runs in the Action. A job is kept if at least one enabled profile

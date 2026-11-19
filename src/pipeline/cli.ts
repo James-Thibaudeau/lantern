@@ -16,6 +16,7 @@ const USAGE = `Usage:
   pnpm cli detect-ats <url> [--name <company>] [--add] [--config <dir>]
   pnpm cli hn-suggest [--thread <id>] [--config <dir>]
   pnpm cli suggestions [list [--all] | accept <id> | reject <id>] [--config <dir>]
+  pnpm cli rank [--config <dir>] [--limit <n>] [--all] [--explain <id>] [--db <file>]
 
 sync pulls new runner results from GitHub into SQLite (data/lantern.db). It needs
 LANTERN_RUNNER_REPO in .env, and LANTERN_GITHUB_TOKEN or a gh CLI login. --from applies
@@ -25,6 +26,10 @@ detect-ats finds a company's job board from a posting or careers-page URL; --add
 on your watchlist. hn-suggest finds companies in HN's latest "Who is hiring?" thread.
 Both read and update the watchlist in your runner repo on GitHub (the token needs
 Contents read/write), or in a local folder with --config.
+
+rank scores the open jobs in SQLite with criteria.json from your runner repo (or a local
+folder with --config) and prints them best first. --explain shows one job's points; --all
+includes closed jobs.
 
 init-runner creates your private runner repo from runner-template/ (default folder:
 ../<repo-name>) and pushes it to GitHub with the gh CLI. --local-only skips GitHub.
@@ -212,6 +217,8 @@ async function main() {
       return (await import('#/watchlist/commands')).hnSuggestCommand(rest)
     case 'suggestions':
       return (await import('#/watchlist/commands')).suggestionsCommand(rest)
+    case 'rank':
+      return (await import('#/rank/commands')).rankCommand(rest)
     case 'init-runner':
       return initRunnerCommand(rest)
     case undefined:

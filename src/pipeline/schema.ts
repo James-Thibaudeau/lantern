@@ -25,6 +25,17 @@ export const ELIGIBILITY = [
 export const EligibilitySchema = z.enum(ELIGIBILITY)
 export type Eligibility = z.infer<typeof EligibilitySchema>
 
+/** Display labels, shared by the app and ranking reasons. */
+export const ELIGIBILITY_LABEL: Record<Eligibility, string> = {
+  remote_canada_ok: 'Remote · Canada OK',
+  canada_hybrid: 'Hybrid · Canada',
+  canada_onsite: 'On-site · Canada',
+  unknown: 'Unknown',
+  remote_us_only: 'Remote · US only',
+  remote_non_canada: 'Remote · outside Canada',
+  non_canada_onsite: 'On-site · outside Canada',
+}
+
 export const ProfileSchema = z.object({
   id: z.string().min(1),
   enabled: z.boolean(),

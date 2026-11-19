@@ -118,6 +118,15 @@ describe('LocalConfigStore', () => {
     expect(await readFile(join(dir, 'companies.json'), 'utf8')).toBe(after)
   })
 
+  it('reads criteria.json, or null when there is none', async () => {
+    const store = new LocalConfigStore(dir)
+    await expect(store.readCriteria()).resolves.toBeNull()
+    await writeFile(join(dir, 'criteria.json'), '{"eligibility":{"remote_canada_ok":10}}')
+    await expect(store.readCriteria()).resolves.toMatchObject({
+      eligibility: { remote_canada_ok: 10 },
+    })
+  })
+
   it('treats the same slug on another ATS as existing', async () => {
     const store = new LocalConfigStore(dir)
     await expect(
@@ -279,5 +288,27 @@ describe('GitHubRunner contents API', () => {
     await expect(runner.putFile('config/companies.json', 'x', 'old', 'msg')).rejects.toBeInstanceOf(
       GitHubConflictError,
     )
+  })
+})
+
+describe('GitHubConfigStore.readCriteria', () => {
+  it('reads config/criteria.json from main', async () => {
+    const content = Buffer.from('{"signals":[]}').toString('base64')
+    const { runner, fetchImpl } = runnerWith(() =>
+      Response.json({ content, encoding: 'base64', sha: 's1' }),
+    )
+    const store = new GitHubConfigStore(runner, 'me/runner')
+    await expect(store.readCriteria()).resolves.toEqual({
+      signals: [],
+      dealbreakers: [],
+      eligibility: {},
+    })
+    expect(fetchImpl.mock.calls[0][0]).toBe(`${API}/contents/config/criteria.json?ref=main`)
+  })
+
+  it('returns null when the file is missing, while getFile still reports a 404', async () => {
+    const { runner } = runnerWith(() => new Response('Not Found', { status: 404 }))
+    await expect(new GitHubConfigStore(runner, 'me/runner').readCriteria()).resolves.toBeNull()
+    await expect(runner.getFile('config/companies.json')).rejects.toThrow(GitHubAuthError)
   })
 })

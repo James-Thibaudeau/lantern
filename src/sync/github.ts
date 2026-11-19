@@ -73,6 +73,8 @@ export class GitHubRunner implements RunSource {
     init: RequestInit = {},
     /** Which token permission this call needs, for the error message. */
     permission: 'Actions' | 'Contents' = 'Actions',
+    /** Hand a 404 back to the caller instead of reporting it as an access problem. */
+    allowNotFound = false,
   ): Promise<Response> {
     const res = await this.fetchImpl(url, {
       ...init,
@@ -88,6 +90,7 @@ export class GitHubRunner implements RunSource {
     if (res.status === 401) {
       throw new GitHubAuthError('GitHub token expired or invalid. Create a new one (see README).')
     }
+    if (res.status === 404 && allowNotFound) return res
     if (res.status === 403 || res.status === 404) {
       throw new GitHubAuthError(
         `GitHub said ${res.status} for ${this.opts.repo}: the repo doesn't exist, or the token ` +
@@ -146,11 +149,30 @@ export class GitHubRunner implements RunSource {
 
   /** Reads a text file from the runner repo's main branch. */
   async getFile(path: string): Promise<{ text: string; sha: string }> {
+    const file = await this.readFile(path, false)
+    if (!file) throw new Error(`${path} not found in ${this.opts.repo}`)
+    return file
+  }
+
+  /**
+   * Like getFile, but returns null when the file isn't there. GitHub also answers 404 when
+   * the token can't read Contents, so callers should mention that in their message.
+   */
+  getOptionalFile(path: string): Promise<{ text: string; sha: string } | null> {
+    return this.readFile(path, true)
+  }
+
+  private async readFile(
+    path: string,
+    allowNotFound: boolean,
+  ): Promise<{ text: string; sha: string } | null> {
     const res = await this.request(
       `${this.api}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=main`,
       {},
       'Contents',
+      allowNotFound,
     )
+    if (res.status === 404) return null
     const body = FileResponse.parse(await res.json())
     if (body.encoding !== 'base64') throw new Error(`Unexpected encoding for ${path}`)
     return { text: Buffer.from(body.content, 'base64').toString('utf8'), sha: body.sha }

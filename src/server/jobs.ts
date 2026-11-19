@@ -4,8 +4,9 @@ import { z } from 'zod'
 
 import { ingestRuns, jobs, type JobRowDb } from '#/db/schema'
 import { EligibilitySchema, SalarySchema, type Eligibility, type Salary } from '#/pipeline/schema'
+import type { JobScore, Reason, ScorableJob } from '#/rank/score'
 
-import { getDb, runSync, startupSync, type SyncStatus } from './db'
+import { getDb, rankingStatus, runSync, startupSync, type SyncStatus } from './db'
 
 /** What the jobs page needs per job (everything except the heavy HTML description). */
 export interface JobRow {
@@ -23,6 +24,10 @@ export interface JobRow {
   postedAt: string | null
   firstSeenAt: string
   closedAt: string | null
+  /** Null when there are no ranking criteria. */
+  score: number | null
+  reasons: Reason[]
+  dealbreaker: string | null
 }
 
 const RunTotals = z.object({
@@ -39,9 +44,12 @@ export interface JobsData {
   lastRun: { runId: string; at: string; totals: z.infer<typeof RunTotals>['totals'] | null } | null
   /** Result of the sync that runs when the app starts (or the latest Sync click). */
   sync: SyncStatus
+  /** Whether jobs are ranked, and with what criteria (one line for the UI). */
+  ranking: { ranked: boolean; ok: boolean; message: string }
 }
 
-function toRow(j: JobRowDb): JobRow {
+function toRow(j: JobRowDb, score: ((job: ScorableJob) => JobScore) | null): JobRow {
+  const s = score?.(j)
   const salary = SalarySchema.safeParse({
     min: j.salaryMin,
     max: j.salaryMax,
@@ -63,6 +71,9 @@ function toRow(j: JobRowDb): JobRow {
     postedAt: j.postedAt,
     firstSeenAt: j.firstSeenAt,
     closedAt: j.closedAt,
+    score: s?.score ?? null,
+    reasons: s?.reasons ?? [],
+    dealbreaker: s?.dealbreaker ?? null,
   }
 }
 
@@ -100,10 +111,12 @@ export const getJobs = createServerFn({ method: 'GET' })
       totals = null
     }
 
+    const ranking = rankingStatus()
     return {
-      jobs: rows.map(toRow),
+      jobs: rows.map((j) => toRow(j, ranking.score)),
       lastRun: latest ? { runId: latest.runId, at: latest.at, totals } : null,
       sync: status,
+      ranking: { ranked: ranking.score !== null, ok: ranking.ok, message: ranking.message },
     }
   })
 

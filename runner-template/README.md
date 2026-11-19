@@ -14,7 +14,7 @@ pnpm cli init-runner my-lantern-runner
 
 That copies this folder to `../my-lantern-runner`, turns the example configs into real ones, and pushes it to a new private repo. Pushing workflow files needs the `workflow` scope on your `gh` token (`gh auth refresh -s workflow`).
 
-Then edit `config/companies.json` and `config/profiles.json`, commit, push, and try a run:
+Then edit `config/companies.json`, `config/profiles.json` and `config/criteria.json`, commit, push, and try a run:
 
 ```bash
 gh workflow run run.yml -f dryRun=true
@@ -27,6 +27,7 @@ gh workflow run run.yml -f dryRun=true
 | `.github/workflows/run.yml` | Daily schedule plus a manual trigger. Calls `James-Thibaudeau/lantern/.github/workflows/ingest.yml@v1`     |
 | `config/companies.json`     | Watchlist: `{ name, ats, slug, workday?: { tenant, host, site } }[]`                                       |
 | `config/profiles.json`      | Profiles for the early filter: `id`, `enabled`, `titleInclude[]`, `titleExclude[]`, `allowedEligibility[]` |
+| `config/criteria.json`      | Ranking for the app: `signals[]`, `dealbreakers[]`, `eligibility` points, `salary` floor                   |
 
 ## Running
 
@@ -49,6 +50,10 @@ gh workflow run run.yml -f dryRun=true
 
 - `titleInclude` / `titleExclude`: case-insensitive whole words or phrases (so `intern` doesn't match "International"). A job is kept if its title matches at least one `titleInclude` of an enabled profile, none of that profile's `titleExclude`, and its eligibility is in that profile's `allowedEligibility`.
 - `allowedEligibility`: any of `canada_onsite`, `canada_hybrid`, `remote_canada_ok`, `remote_us_only`, `remote_non_canada`, `non_canada_onsite`, `unknown`. Keep `unknown`, since the local LLM pass resolves those.
+
+### `criteria.json`
+
+Ranking for the Lantern app: weighted `signals`, `dealbreakers`, points per `eligibility` and an optional `salary` floor. It's read on your laptop, not in the Action, so it can change without a run. See "Ranking" in Lantern's README.
 
 ## Upgrading Lantern
 

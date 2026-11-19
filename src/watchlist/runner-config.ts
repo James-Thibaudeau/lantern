@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { formatCompanies, parseCompanies, parseConfig, type IngestConfig } from '#/pipeline/config'
 import type { Company } from '#/pipeline/schema'
+import { parseCriteria, type Criteria } from '#/rank/criteria'
 import { GitHubConflictError, type GitHubRunner } from '#/sync/github'
 
 import { boardKey } from './detect'
@@ -14,6 +15,8 @@ export interface ConfigStore {
   read(): Promise<IngestConfig>
   /** Adds a company to companies.json unless it's already there. */
   addCompany(company: Company): Promise<'added' | 'exists'>
+  /** Reads criteria.json for ranking; null when there isn't one. */
+  readCriteria(): Promise<Criteria | null>
 }
 
 function withCompany(companies: Company[], company: Company): Company[] | null {
@@ -44,6 +47,18 @@ export class LocalConfigStore implements ConfigStore {
     if (!next) return 'exists'
     await writeFile(join(this.dir, 'companies.json'), formatCompanies(next))
     return 'added'
+  }
+
+  async readCriteria(): Promise<Criteria | null> {
+    const path = join(this.dir, 'criteria.json')
+    let text: string
+    try {
+      text = await readFile(path, 'utf8')
+    } catch (err) {
+      if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return null
+      throw err
+    }
+    return parseCriteria(path, text)
   }
 }
 
@@ -89,5 +104,9 @@ export class GitHubConfigStore implements ConfigStore {
         if (!(err instanceof GitHubConflictError) || attempt >= 1) throw err
       }
     }
+  }
+  async readCriteria(): Promise<Criteria | null> {
+    const file = await this.runner.getOptionalFile('config/criteria.json')
+    return file ? parseCriteria('config/criteria.json', file.text) : null
   }
 }

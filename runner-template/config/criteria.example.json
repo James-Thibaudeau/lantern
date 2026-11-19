@@ -1,0 +1,40 @@
+{
+  "signals": [
+    {
+      "label": "Frontend title",
+      "phrases": ["frontend", "front-end", "front end", "ui engineer", "web engineer"],
+      "weight": 12,
+      "in": "title"
+    },
+    {
+      "label": "Senior or Staff",
+      "phrases": ["senior", "staff", "sr."],
+      "weight": 6,
+      "in": "title"
+    },
+    {
+      "label": "Full stack title",
+      "phrases": ["full stack", "full-stack", "fullstack"],
+      "weight": 4,
+      "in": "title"
+    },
+    { "label": "React", "phrases": ["react", "next.js", "nextjs"], "weight": 8 },
+    { "label": "TypeScript", "phrases": ["typescript"], "weight": 6 },
+    {
+      "label": "Design systems",
+      "phrases": ["design system", "design systems", "component library"],
+      "weight": 4
+    },
+    {
+      "label": "Mostly backend",
+      "phrases": ["backend", "back-end", "platform engineer", "data engineer"],
+      "weight": -8,
+      "in": "title"
+    }
+  ],
+  "dealbreakers": [
+    { "label": "Clearance required", "phrases": ["security clearance", "secret clearance"] }
+  ],
+  "eligibility": { "remote_canada_ok": 10, "canada_hybrid": 4, "canada_onsite": 0, "unknown": 2 },
+  "salary": { "currency": "CAD", "floor": 140000, "belowFloor": -15 }
+}

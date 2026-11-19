@@ -4,7 +4,7 @@ Lantern finds job postings on company job boards, keeps the ones that match what
 
 It reads the public job-board APIs that companies already publish (Greenhouse, Lever and Ashby today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
 
-> **Status:** ingestion, the daily Action, local sync into SQLite and watchlist tools work end to end, with jobs, watchlist and run-history pages. Ranking and resume tailoring are next.
+> **Status:** ingestion, the daily Action, local sync into SQLite, watchlist tools and rules-based ranking work end to end, with jobs, watchlist and run-history pages. Resume tailoring is next.
 
 ## How it works
 
@@ -89,6 +89,24 @@ pnpm cli suggestions                                  # then: suggestions accept
 - **Guessed boards** are labelled, since another company can own the same slug. Greenhouse reports a board's company name, so a guessed Greenhouse board whose name doesn't fit is dropped; for Ashby and Lever, open the board to check.
 - The **`/watchlist`** page does all of this in the app: add from a URL, check HN, and accept or reject suggestions. Accepting commits one line to `config/companies.json` in your runner repo (the token needs Contents read/write); the next run picks it up. Every command also takes `--config <dir>` to use a local folder instead.
 
+## Ranking
+
+`/jobs` lists the best matches first, scored by `config/criteria.json` in your runner repo. Scoring is plain rules, so every point shows up as a reason when you open a job:
+
+- **`signals`**: `{ label, phrases[], weight, in? }`. If any phrase matches, `weight` is added once. Phrases are whole words, ignoring case, like the profile filter. `in` is `title`, `description`, `location` (the posting's location text, for a city) or `any` (title or description, the default). Use negative weights to push jobs down.
+- **`dealbreakers`**: `{ label, phrases[], in? }`. A match sinks the job to the bottom of the list, dimmed and labelled.
+- **`eligibility`**: points per location type, for example `{ "remote_canada_ok": 10, "canada_hybrid": 4 }`.
+- **`salary`**: `{ currency, floor, belowFloor }`. Adds `belowFloor` (0 or less) when an annual salary in that currency tops out below `floor`. A missing salary is neutral.
+
+Start from `runner-template/config/criteria.example.json`, then tune it in the terminal against a local checkout of your runner repo:
+
+```bash
+pnpm cli rank --config ../lantern-runner/config               # open jobs, best first, with reasons
+pnpm cli rank --config ../lantern-runner/config --explain 3fa2 # one job's points (id prefix)
+```
+
+The app reads the criteria again on every Sync. To try changes in the app before pushing them, set `LANTERN_CONFIG_DIR=../lantern-runner/config` in `.env`. Without a `criteria.json`, jobs are listed newest first.
+
 ## Development
 
 | Command                         | What it does                                           |
@@ -97,6 +115,7 @@ pnpm cli suggestions                                  # then: suggestions accept
 | `pnpm cli ingest …`             | Ingestion CLI (`pnpm cli --help`)                      |
 | `pnpm sync`                     | Pull new runner results into `data/lantern.db`         |
 | `pnpm cli hn-suggest`           | Suggest companies from HN's "Who is hiring?"           |
+| `pnpm cli rank`                 | Print open jobs ranked by `criteria.json`              |
 | `pnpm db:generate`              | New migration after editing `src/db/schema.ts`         |
 | `pnpm check`                    | Format check, lint, typecheck and tests (what CI runs) |
 | `pnpm format` / `pnpm lint:fix` | Fix formatting / auto-fixable lint                     |

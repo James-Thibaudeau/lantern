@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 
 import { describe, expect, it } from 'vitest'
 
+import { LocalConfigStore } from '../../watchlist/runner-config'
 import { loadConfig } from '../config'
 import { initRunner } from '../init-runner'
 
@@ -25,6 +26,8 @@ describe('runner-template', () => {
     const config = await loadConfig(join(dir, 'config'))
     expect(config.companies.length).toBeGreaterThan(0)
     expect(config.profiles.some((p) => p.enabled)).toBe(true)
+    const criteria = await new LocalConfigStore(join(dir, 'config')).readCriteria()
+    expect(criteria?.signals.length).toBeGreaterThan(0)
   })
 
   it('pins the runner workflow to a matching tag and lantern_ref', async () => {
@@ -52,6 +55,7 @@ describe('initRunner (local only)', () => {
     expect(result).toEqual({ dir })
     expect((await readdir(join(dir, 'config'))).toSorted()).toEqual([
       'companies.json',
+      'criteria.json',
       'profiles.json',
     ])
     expect(await readdir(join(dir, '.github', 'workflows'))).toEqual(['run.yml'])

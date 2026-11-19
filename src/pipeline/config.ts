@@ -10,7 +10,8 @@ export interface IngestConfig {
   profiles: Profile[]
 }
 
-function parseJson<T>(label: string, text: string, schema: z.ZodType<T>): T {
+/** Parses a JSON config file and checks it against a schema, with errors that name the file. */
+export function parseJsonFile<T>(label: string, text: string, schema: z.ZodType<T>): T {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -27,7 +28,7 @@ function parseJson<T>(label: string, text: string, schema: z.ZodType<T>): T {
 
 /** Parses companies.json and checks slugs are unique. */
 export function parseCompanies(label: string, text: string): Company[] {
-  const companies = parseJson(label, text, z.array(CompanySchema))
+  const companies = parseJsonFile(label, text, z.array(CompanySchema))
   const seen = new Set<string>()
   for (const c of companies) {
     if (seen.has(c.slug)) throw new Error(`Duplicate company slug "${c.slug}" in companies.json`)
@@ -42,7 +43,7 @@ export function parseConfig(files: {
   profiles: { label: string; text: string }
 }): IngestConfig {
   const companies = parseCompanies(files.companies.label, files.companies.text)
-  const profiles = parseJson(files.profiles.label, files.profiles.text, z.array(ProfileSchema))
+  const profiles = parseJsonFile(files.profiles.label, files.profiles.text, z.array(ProfileSchema))
   if (!profiles.some((p) => p.enabled)) {
     throw new Error('profiles.json has no enabled profile, so every job would be filtered out')
   }

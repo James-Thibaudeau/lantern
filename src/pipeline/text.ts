@@ -39,4 +39,18 @@ export function toIso(value: string | number | null | undefined): string | null 
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Whole-word, case-insensitive phrase match, so "intern" doesn't match "International".
+ * An empty list matches nothing.
+ */
+export function phraseMatcher(phrases: string[]): (text: string) => boolean {
+  if (phrases.length === 0) return () => false
+  const re = new RegExp(`(?<![a-z0-9])(${phrases.map(escapeRegex).join('|')})(?![a-z0-9])`, 'i')
+  return (text) => re.test(text)
+}
+
 export { decodeHTML }

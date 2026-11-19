@@ -2,7 +2,13 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { z } from 'zod'
 
-import { ELIGIBILITY, EligibilitySchema, type Eligibility, type Salary } from '#/pipeline/schema'
+import {
+  ELIGIBILITY,
+  ELIGIBILITY_LABEL,
+  EligibilitySchema,
+  type Eligibility,
+  type Salary,
+} from '#/pipeline/schema'
 import { getJobs, syncNow, type JobRow } from '#/server/jobs'
 import { runNow } from '#/server/runs'
 
@@ -13,6 +19,8 @@ const JobsSearch = z.object({
   company: z.string().optional().catch(undefined),
   q: z.string().optional().catch(undefined),
   closed: z.boolean().optional().catch(undefined),
+  /** Defaults to score when there are ranking criteria, newest otherwise. */
+  sort: z.enum(['score', 'newest']).optional().catch(undefined),
 })
 type JobsSearch = z.infer<typeof JobsSearch>
 
@@ -27,16 +35,6 @@ export const Route = createFileRoute('/jobs')({
   head: () => ({ meta: [{ title: 'Jobs · Lantern' }] }),
   component: JobsPage,
 })
-
-const ELIGIBILITY_LABEL: Record<Eligibility, string> = {
-  remote_canada_ok: 'Remote · Canada OK',
-  canada_hybrid: 'Hybrid · Canada',
-  canada_onsite: 'On-site · Canada',
-  unknown: 'Unknown',
-  remote_us_only: 'Remote · US only',
-  remote_non_canada: 'Remote · outside Canada',
-  non_canada_onsite: 'On-site · outside Canada',
-}
 
 const ELIGIBILITY_STYLE: Record<Eligibility, string> = {
   remote_canada_ok: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -83,10 +81,22 @@ function matches(job: JobRow, search: JobsSearch): boolean {
   return true
 }
 
+/**
+ * Best match first: jobs without a dealbreaker, then by score. Array sort is stable, so ties
+ * keep the server's newest-first order. (Same rule as compareScores in src/rank/score.ts,
+ * which can't be imported here because it pulls in server-only code.)
+ */
+function byScore(a: JobRow, b: JobRow): number {
+  if ((a.dealbreaker === null) !== (b.dealbreaker === null)) return a.dealbreaker === null ? -1 : 1
+  return (b.score ?? 0) - (a.score ?? 0)
+}
+
+const points = (n: number) => (n > 0 ? `+${n}` : `−${Math.abs(n)}`)
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function JobsPage() {
-  const { jobs, lastRun, sync } = Route.useLoaderData()
+  const { jobs, lastRun, sync, ranking } = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
@@ -132,7 +142,11 @@ function JobsPage() {
     () => ELIGIBILITY.filter((e) => jobs.some((j) => j.eligibility === e)),
     [jobs],
   )
-  const visible = useMemo(() => jobs.filter((j) => matches(j, search)), [jobs, search])
+  const sort = ranking.ranked ? (search.sort ?? 'score') : 'newest'
+  const visible = useMemo(() => {
+    const kept = jobs.filter((j) => matches(j, search))
+    return sort === 'score' ? kept.toSorted(byScore) : kept
+  }, [jobs, search, sort])
   const filtered = Boolean(search.eligibility || search.company || search.q)
 
   return (
@@ -185,6 +199,14 @@ function JobsPage() {
       >
         {status.message}
       </output>
+      {/* Quiet when ranking works; otherwise say why the list isn't ranked. */}
+      {(!ranking.ok || !ranking.ranked) && (
+        <p
+          className={`-mt-3 mb-4 text-sm ${ranking.ok ? 'text-zinc-500' : 'text-red-700 dark:text-red-400'}`}
+        >
+          {ranking.message}
+        </p>
+      )}
 
       {jobs.length === 0 && !lastRun ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
@@ -236,6 +258,19 @@ function JobsPage() {
                 </option>
               ))}
             </select>
+            {ranking.ranked && (
+              <select
+                aria-label="Sort jobs"
+                value={sort}
+                onChange={(e) =>
+                  setSearch({ sort: e.target.value === 'newest' ? 'newest' : undefined })
+                }
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="score">Best match</option>
+                <option value="newest">Newest</option>
+              </select>
+            )}
             <label className="flex items-center gap-2 self-center text-sm text-zinc-600 dark:text-zinc-400">
               <input
                 type="checkbox"
@@ -261,29 +296,44 @@ function JobsPage() {
 
           <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
             {visible.map((job) => (
-              <li key={job.id}>
+              <li key={job.id} className={job.dealbreaker ? 'opacity-60' : undefined}>
                 <details className="group">
                   {/* The summary's label is the job title and company inside it; the rule
                       only looks at direct text. */}
                   {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label */}
                   <summary className="grid cursor-pointer list-none gap-x-4 gap-y-1 px-4 py-3 hover:bg-zinc-50 sm:grid-cols-[1fr_auto] dark:hover:bg-zinc-900">
-                    <div className="min-w-0">
-                      <p className="font-medium">
-                        {job.title}
-                        {new Date(job.firstSeenAt).getTime() >= newSince && !job.closedAt && (
-                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                            New
-                          </span>
-                        )}
-                        {job.closedAt && (
-                          <span className="ml-2 rounded-full bg-zinc-200 px-2 py-0.5 align-middle text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                            Closed {formatDate(job.closedAt)}
-                          </span>
-                        )}
-                      </p>
-                      <p className="truncate text-sm text-zinc-500">
-                        {job.company} · {job.locationText || 'No location'}
-                      </p>
+                    <div className="flex min-w-0 gap-3">
+                      {job.score !== null && (
+                        <span
+                          title="Match score: open the job to see why"
+                          className="mt-0.5 h-fit w-9 shrink-0 rounded-md bg-zinc-100 py-0.5 text-center text-xs font-semibold text-zinc-800 tabular-nums dark:bg-zinc-800 dark:text-zinc-200"
+                        >
+                          {job.score}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium">
+                          {job.title}
+                          {new Date(job.firstSeenAt).getTime() >= newSince && !job.closedAt && (
+                            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                              New
+                            </span>
+                          )}
+                          {job.closedAt && (
+                            <span className="ml-2 rounded-full bg-zinc-200 px-2 py-0.5 align-middle text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              Closed {formatDate(job.closedAt)}
+                            </span>
+                          )}
+                          {job.dealbreaker && (
+                            <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 align-middle text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                              {job.dealbreaker}
+                            </span>
+                          )}
+                        </p>
+                        <p className="truncate text-sm text-zinc-500">
+                          {job.company} · {job.locationText || 'No location'}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm sm:justify-end">
                       <span
@@ -323,6 +373,28 @@ function JobsPage() {
                         via {job.source} · first seen {formatDate(job.firstSeenAt)}
                       </span>
                     </div>
+                    {job.score !== null && (
+                      <ul
+                        aria-label="Why this score"
+                        className="mb-3 flex flex-wrap gap-1.5 text-xs"
+                      >
+                        {job.reasons.map((r) => (
+                          <li
+                            key={r.label}
+                            className={`rounded-full px-2 py-0.5 font-medium tabular-nums ${
+                              r.points > 0
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                            }`}
+                          >
+                            {points(r.points)} {r.label}
+                          </li>
+                        ))}
+                        {job.reasons.length === 0 && (
+                          <li className="text-zinc-500">No criteria matched this job.</li>
+                        )}
+                      </ul>
+                    )}
                     <p className="max-h-96 overflow-y-auto text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">
                       {job.descriptionText}
                     </p>
