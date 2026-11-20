@@ -2,6 +2,7 @@ import { openDb, type Db } from '#/db'
 import { createScorer, type JobScore, type ScorableJob } from '#/rank/score'
 import { githubRunner, loadLocalEnv } from '#/sync/settings'
 import { sync, type SyncResult } from '#/sync/sync'
+import { SYSTEM_PROMPT } from '#/tailor/prompt'
 import type { Resume } from '#/tailor/resume'
 import { GitHubConfigStore, LocalConfigStore, type ConfigStore } from '#/watchlist/runner-config'
 
@@ -81,7 +82,7 @@ export async function configStoreForApp(): Promise<ConfigStore> {
 }
 
 /** Reads criteria.json again. A failed read keeps the last criteria that worked. */
-async function reloadCriteria(): Promise<void> {
+export async function reloadCriteria(): Promise<void> {
   let where = 'the runner repo'
   try {
     const store = await configStoreForApp()
@@ -111,6 +112,46 @@ async function reloadCriteria(): Promise<void> {
         (ranking.score ? ' Still using the last criteria read.' : ''),
     }
   }
+}
+
+export interface PromptStatus {
+  /** The tailoring prompt in use: config/tailoring-prompt.md, or the built-in one. */
+  text: string
+  custom: boolean
+  ok: boolean
+  message: string
+}
+
+let prompt: PromptStatus = { text: SYSTEM_PROMPT, custom: false, ok: true, message: '' }
+
+export function promptStatus(): PromptStatus {
+  return prompt
+}
+
+/** Reads config/tailoring-prompt.md again. A failed read keeps the last prompt that worked. */
+export async function reloadPrompt(): Promise<PromptStatus> {
+  try {
+    const store = await configStoreForApp()
+    const file = await store.readConfigFile('tailoring-prompt.md')
+    prompt =
+      file && file.text.trim()
+        ? {
+            text: file.text,
+            custom: true,
+            ok: true,
+            message: `Using tailoring-prompt.md from ${store.describe}.`,
+          }
+        : {
+            text: SYSTEM_PROMPT,
+            custom: false,
+            ok: true,
+            message: 'Using the built-in tailoring prompt.',
+          }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    prompt = { ...prompt, ok: false, message: `Couldn't read tailoring-prompt.md: ${reason}` }
+  }
+  return prompt
 }
 
 /** Reads resume.json again. A failed read keeps the last resume that worked. */
@@ -145,7 +186,7 @@ export function runSync(): Promise<SyncStatus> {
   running ??= (async (): Promise<SyncStatus> => {
     const at = new Date().toISOString()
     // Sync is when the app picks up config changes, so criteria and the resume are read again.
-    await Promise.all([reloadCriteria(), reloadResume()])
+    await Promise.all([reloadCriteria(), reloadResume(), reloadPrompt()])
     try {
       const { runner } = await githubRunner()
       const result = await sync(getDb(), runner)

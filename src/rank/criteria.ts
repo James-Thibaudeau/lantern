@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { parseJsonFile } from '#/pipeline/config'
+import { parseJsonFile } from '#/pipeline/json-file'
 import { EligibilitySchema } from '#/pipeline/schema'
 
 // criteria.json lives in the private runner repo, next to profiles.json. Objects are strict,

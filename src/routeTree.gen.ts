@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as ResumeRouteImport } from './routes/resume'
 import { Route as RunsRouteImport } from './routes/runs'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
+import { Route as ResumePromptRouteImport } from './routes/resume_.prompt'
 import { Route as PrintResumeTailoredIdRouteImport } from './routes/print/resume/$tailoredId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -25,6 +28,16 @@ const JobsRoute = JobsRouteImport.update({
   path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RankingRoute = RankingRouteImport.update({
+  id: '/ranking',
+  path: '/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResumeRoute = ResumeRouteImport.update({
+  id: '/resume',
+  path: '/resume',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RunsRoute = RunsRouteImport.update({
   id: '/runs',
   path: '/runs',
@@ -33,6 +46,11 @@ const RunsRoute = RunsRouteImport.update({
 const WatchlistRoute = WatchlistRouteImport.update({
   id: '/watchlist',
   path: '/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResumePromptRoute = ResumePromptRouteImport.update({
+  id: '/resume_/prompt',
+  path: '/resume/prompt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrintResumeTailoredIdRoute = PrintResumeTailoredIdRouteImport.update({
@@ -44,45 +62,75 @@ const PrintResumeTailoredIdRoute = PrintResumeTailoredIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/jobs': typeof JobsRoute
+  '/ranking': typeof RankingRoute
+  '/resume': typeof ResumeRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/resume/prompt': typeof ResumePromptRoute
   '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/jobs': typeof JobsRoute
+  '/ranking': typeof RankingRoute
+  '/resume': typeof ResumeRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/resume/prompt': typeof ResumePromptRoute
   '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/jobs': typeof JobsRoute
+  '/ranking': typeof RankingRoute
+  '/resume': typeof ResumeRoute
   '/runs': typeof RunsRoute
   '/watchlist': typeof WatchlistRoute
+  '/resume_/prompt': typeof ResumePromptRoute
   '/print/resume/$tailoredId': typeof PrintResumeTailoredIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/jobs' | '/runs' | '/watchlist' | '/print/resume/$tailoredId'
+    | '/'
+    | '/jobs'
+    | '/ranking'
+    | '/resume'
+    | '/runs'
+    | '/watchlist'
+    | '/resume/prompt'
+    | '/print/resume/$tailoredId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jobs' | '/runs' | '/watchlist' | '/print/resume/$tailoredId'
+  to:
+    | '/'
+    | '/jobs'
+    | '/ranking'
+    | '/resume'
+    | '/runs'
+    | '/watchlist'
+    | '/resume/prompt'
+    | '/print/resume/$tailoredId'
   id:
     | '__root__'
     | '/'
     | '/jobs'
+    | '/ranking'
+    | '/resume'
     | '/runs'
     | '/watchlist'
+    | '/resume_/prompt'
     | '/print/resume/$tailoredId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   JobsRoute: typeof JobsRoute
+  RankingRoute: typeof RankingRoute
+  ResumeRoute: typeof ResumeRoute
   RunsRoute: typeof RunsRoute
   WatchlistRoute: typeof WatchlistRoute
+  ResumePromptRoute: typeof ResumePromptRoute
   PrintResumeTailoredIdRoute: typeof PrintResumeTailoredIdRoute
 }
 
@@ -102,6 +150,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ranking': {
+      id: '/ranking'
+      path: '/ranking'
+      fullPath: '/ranking'
+      preLoaderRoute: typeof RankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resume': {
+      id: '/resume'
+      path: '/resume'
+      fullPath: '/resume'
+      preLoaderRoute: typeof ResumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs': {
       id: '/runs'
       path: '/runs'
@@ -114,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/watchlist'
       fullPath: '/watchlist'
       preLoaderRoute: typeof WatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resume_/prompt': {
+      id: '/resume_/prompt'
+      path: '/resume/prompt'
+      fullPath: '/resume/prompt'
+      preLoaderRoute: typeof ResumePromptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/print/resume/$tailoredId': {
@@ -129,8 +198,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   JobsRoute: JobsRoute,
+  RankingRoute: RankingRoute,
+  ResumeRoute: ResumeRoute,
   RunsRoute: RunsRoute,
   WatchlistRoute: WatchlistRoute,
+  ResumePromptRoute: ResumePromptRoute,
   PrintResumeTailoredIdRoute: PrintResumeTailoredIdRoute,
 }
 export const routeTree = rootRouteImport

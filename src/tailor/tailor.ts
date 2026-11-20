@@ -38,19 +38,32 @@ export interface TailorResult {
   usage: ClaudeUsage | null
   model: string
   resumeHash: string
+  promptHash: string
+  /** The request sent with the prompt: your resume and the posting. */
+  request: string
 }
 
 /** Identifies a version of the master resume, to spot tailorings made from an older one. */
 export const resumeHash = (r: Resume) => sha256(JSON.stringify(r), 16)
 
+/** Identifies a version of the tailoring prompt. Whitespace at the ends doesn't count. */
+export const promptHash = (system: string) => sha256(system.trim(), 16)
+
+/**
+ * Tailors the resume to the posting. `system` is the tailoring prompt: config/tailoring-prompt.md
+ * when you've edited it, else the built-in one. Whatever it says, the reply is checked against
+ * the resume before anything is kept.
+ */
 export async function tailorResume(
   resume: Resume,
   posting: PostingInput,
   model: TailorModel = claudeCliModel,
+  system: string = SYSTEM_PROMPT,
 ): Promise<TailorResult> {
+  const request = userPrompt(resume, posting)
   const reply = await model.run({
-    system: SYSTEM_PROMPT,
-    prompt: userPrompt(resume, posting),
+    system: system.trim(),
+    prompt: request,
     jsonSchema: tailoringJsonSchema(),
   })
   const parsed = TailoringSchema.safeParse(reply.output)
@@ -66,5 +79,7 @@ export async function tailorResume(
     usage: reply.usage,
     model: reply.model,
     resumeHash: resumeHash(resume),
+    promptHash: promptHash(system),
+    request,
   }
 }

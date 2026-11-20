@@ -3,27 +3,14 @@ import { join } from 'node:path'
 
 import { z } from 'zod'
 
+import { parseJsonFile } from './json-file'
 import { CompanySchema, ProfileSchema, type Company, type Profile } from './schema'
+
+export { parseJsonFile }
 
 export interface IngestConfig {
   companies: Company[]
   profiles: Profile[]
-}
-
-/** Parses a JSON config file and checks it against a schema, with errors that name the file. */
-export function parseJsonFile<T>(label: string, text: string, schema: z.ZodType<T>): T {
-  let raw: unknown
-  try {
-    raw = JSON.parse(text)
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err)
-    throw new Error(`Could not read ${label}: ${reason}`, { cause: err })
-  }
-  const parsed = schema.safeParse(raw)
-  if (!parsed.success) {
-    throw new Error(`Invalid ${label}:\n${z.prettifyError(parsed.error)}`)
-  }
-  return parsed.data
 }
 
 /** Parses companies.json and checks slugs are unique. */

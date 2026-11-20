@@ -33,6 +33,8 @@ export class GitHubConflictError extends Error {
   override name = 'GitHubConflictError'
 }
 
+const PutResponse = z.object({ content: z.object({ sha: z.string() }) })
+
 const FileResponse = z.object({ content: z.string(), sha: z.string(), encoding: z.string() })
 
 const RunsResponse = z.object({
@@ -98,6 +100,10 @@ export class GitHubRunner implements RunSource {
       )
     }
     if (res.status === 409) throw new GitHubConflictError(`GitHub said 409 (conflict) for ${url}`)
+    // Creating a file that someone else created first: GitHub wants its sha.
+    if (res.status === 422 && init.method === 'PUT') {
+      throw new GitHubConflictError(`GitHub said 422 (file already exists) for ${url}`)
+    }
     if (!res.ok) throw new Error(`GitHub API ${res.status} for ${url}`)
     return res
   }
@@ -178,21 +184,27 @@ export class GitHubRunner implements RunSource {
     return { text: Buffer.from(body.content, 'base64').toString('utf8'), sha: body.sha }
   }
 
-  /** Commits a new version of a file to main. `sha` is the version it replaces. */
-  async putFile(path: string, text: string, sha: string, message: string): Promise<void> {
-    await this.request(
+  /**
+   * Commits a new version of a file to main and returns its new sha. `sha` is the version it
+   * replaces, or null to create the file. A file that changed (or appeared) since it was read
+   * throws GitHubConflictError.
+   */
+  async putFile(path: string, text: string, sha: string | null, message: string): Promise<string> {
+    const res = await this.request(
       `${this.api}/contents/${path.split('/').map(encodeURIComponent).join('/')}`,
       {
         method: 'PUT',
         body: JSON.stringify({
           message,
           content: Buffer.from(text, 'utf8').toString('base64'),
-          sha,
+          ...(sha ? { sha } : {}),
           branch: 'main',
         }),
       },
       'Contents',
     )
+    const body = PutResponse.safeParse(await res.json().catch(() => null))
+    return body.data?.content.sha ?? ''
   }
 
   get actionsUrl(): string {

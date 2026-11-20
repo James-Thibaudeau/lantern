@@ -22,6 +22,13 @@
       "when": 1795060020909,
       "tag": "0002_tailored_resumes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1795189359686,
+      "tag": "0003_tailoring_prompt",
+      "breakpoints": true
     }
   ]
 }

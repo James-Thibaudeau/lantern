@@ -99,6 +99,29 @@ const CliResult = z.looseObject({
   modelUsage: z.record(z.string(), z.unknown()).nullish().catch(undefined),
 })
 
+const ModelUsage = z.looseObject({
+  outputTokens: z.number().nullish().catch(undefined),
+  output_tokens: z.number().nullish().catch(undefined),
+})
+
+/**
+ * The model that did the work. Claude Code can also use a small model for housekeeping, and
+ * the order of modelUsage isn't meaningful, so take the one with the most output tokens.
+ */
+export function mainModel(usage: Record<string, unknown> | null | undefined): string {
+  let best = ''
+  let most = -1
+  for (const [model, value] of Object.entries(usage ?? {})) {
+    const u = ModelUsage.safeParse(value).data
+    const out = u?.outputTokens ?? u?.output_tokens ?? 0
+    if (out > most) {
+      best = model
+      most = out
+    }
+  }
+  return best
+}
+
 function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false } {
   try {
     const value: unknown = JSON.parse(text)
@@ -154,7 +177,7 @@ export function parseClaudeOutput(stdout: string): Omit<ClaudeCallResult, 'durat
       cacheReadTokens: r.usage?.cache_read_input_tokens ?? 0,
       cacheCreationTokens: r.usage?.cache_creation_input_tokens ?? 0,
     },
-    model: Object.keys(r.modelUsage ?? {})[0] ?? '',
+    model: mainModel(r.modelUsage),
   }
 }
 

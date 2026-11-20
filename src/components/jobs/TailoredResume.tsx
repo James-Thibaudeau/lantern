@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   getTailoring,
@@ -9,6 +9,7 @@ import {
 } from '#/server/tailor'
 import type { Change } from '#/tailor/changes'
 
+import { ResumePreview } from '../ResumePreview'
 import { Badge, buttonClass } from '../ui'
 import { formatDate } from './format'
 
@@ -72,48 +73,7 @@ export function useTailoring(jobId: string) {
 
 export type Tailoring = ReturnType<typeof useTailoring>
 
-/** The rendered resume, scaled to fit the pane. Sandboxed: no scripts, no shared styles. */
-function Preview({ html, title }: { html: string; title: string }) {
-  const PAGE = 860 // the resume's own width (8.5in) plus its margin
-  const box = useRef<HTMLDivElement>(null)
-  const frame = useRef<HTMLIFrameElement>(null)
-  const [scale, setScale] = useState(1)
-  const [height, setHeight] = useState(1100)
-
-  useEffect(() => {
-    const observer = new ResizeObserver(([entry]) => {
-      setScale(Math.min(1, entry.contentRect.width / PAGE))
-    })
-    if (box.current) observer.observe(box.current)
-    return () => observer.disconnect()
-  }, [])
-
-  function measure() {
-    const doc = frame.current?.contentDocument
-    if (doc) setHeight(doc.documentElement.scrollHeight)
-  }
-
-  return (
-    <div
-      ref={box}
-      className="overflow-hidden rounded-lg border border-line bg-[#c9ccd3]"
-      style={{ height: height * scale }}
-    >
-      <iframe
-        ref={frame}
-        title={title}
-        srcDoc={html}
-        // allow-same-origin (without allow-scripts) only lets us measure the page's height.
-        sandbox="allow-same-origin"
-        onLoad={measure}
-        className="origin-top-left border-0"
-        style={{ width: PAGE, height, transform: `scale(${scale})` }}
-      />
-    </div>
-  )
-}
-
-function ChangeBody({
+export function ChangeBody({
   change,
   bulletText,
 }: {
@@ -159,7 +119,7 @@ function ChangeBody({
   )
 }
 
-function changeTitle(c: Change): string {
+export function changeTitle(c: Change): string {
   if (c.kind === 'summary') return 'Summary'
   if (c.kind === 'skills') return `Skills · ${c.group}`
   if (c.kind === 'bullets') return `${c.title}, ${c.employer} · which bullets`
@@ -269,9 +229,13 @@ export function TailoredResume({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 id="tailored" className="flex flex-wrap items-center gap-2 text-base font-semibold">
           Tailored resume
-          {(view.stale.job || view.stale.resume) && (
+          {(view.stale.job || view.stale.resume || view.stale.prompt) && (
             <Badge tone="warning">
-              {view.stale.job ? 'Posting changed since' : 'resume.json changed since'}
+              {view.stale.job
+                ? 'Posting changed since'
+                : view.stale.resume
+                  ? 'resume.json changed since'
+                  : 'Prompt changed since'}
             </Badge>
           )}
           {appliedWith && <Badge tone="blue">Applied with v{appliedWith.version}</Badge>}
@@ -335,7 +299,7 @@ export function TailoredResume({
       />
 
       <h4 className="mt-6 mb-2 text-xs font-medium tracking-wide text-muted uppercase">Preview</h4>
-      <Preview key={view.id} html={view.html} title={`Tailored resume v${view.version}`} />
+      <ResumePreview key={view.id} html={view.html} title={`Tailored resume v${view.version}`} />
       <p className="mt-2 text-xs text-muted">
         Open it to print to PDF (⌘P). v{view.version} · {formatDate(view.createdAt)} · {view.model}
       </p>

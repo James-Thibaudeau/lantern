@@ -123,6 +123,7 @@ describe('tailored resumes', () => {
         tailoring: { bullets: ['x', 'y'], nested: { n: 1 } },
         checks: [{ ok: true }],
         usage: { inputTokens: 10 },
+        promptHash: 'ph',
         createdAt: '2026-11-18T00:00:00.000Z',
       }),
     )
@@ -134,12 +135,15 @@ describe('tailored resumes', () => {
       model: 'test-model',
       resumeHash: 'rh',
       jobHash: 'jh',
+      promptHash: 'ph',
       tailoring: { bullets: ['x', 'y'], nested: { n: 1 } },
       checks: [{ ok: true }],
       decisions: {},
       usage: { inputTokens: 10 },
     })
     expect(getTailoring(db, created.id + 100)).toBeUndefined()
+    // Versions saved without a prompt hash (from before prompts were editable) read as null.
+    expect(insertTailoring(db, tailoring('a')).promptHash).toBeNull()
   })
 
   it('accumulates decisions and ignores a missing id', () => {

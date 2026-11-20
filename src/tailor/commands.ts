@@ -78,12 +78,16 @@ export async function tailorCommand(argv: string[]): Promise<number> {
   console.log(`Tailoring for ${job.title} · ${job.company} (about a minute)…`)
 
   const started = Date.now()
-  const result = await tailorResume(resume, postingFrom(job))
+  const promptFile = await store.readConfigFile('tailoring-prompt.md')
+  const system = promptFile?.text.trim() ? promptFile.text : undefined
+  if (system) console.log('Using tailoring-prompt.md from', store.describe)
+  const result = await tailorResume(resume, postingFrom(job), undefined, system)
   const saved = insertTailoring(db, {
     jobId: job.id,
     model: result.model,
     resumeHash: result.resumeHash,
     jobHash: job.contentHash,
+    promptHash: result.promptHash,
     tailoring: storeTailoring(resume, result.tailoring),
     checks: { ...result.checks, fitNotes: result.tailoring.fitNotes },
     usage: result.usage,

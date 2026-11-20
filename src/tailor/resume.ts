@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { parseJsonFile } from '#/pipeline/config'
+import { parseJsonFile } from '#/pipeline/json-file'
 
 // The master resume: config/resume.json in the private runner repo. Tailoring only ever
 // selects, orders and rewords what's here, so this file is the source of truth for every fact

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { formatCompanies, parseCompanies, parseConfig, type IngestConfig } from '#/pipeline/config'
 import type { Company } from '#/pipeline/schema'
+import { sha256 } from '#/pipeline/text'
 import { parseCriteria, type Criteria } from '#/rank/criteria'
 import { GitHubConflictError, type GitHubRunner } from '#/sync/github'
 import { parseResume, type Resume } from '#/tailor/resume'
@@ -20,6 +21,35 @@ export interface ConfigStore {
   readCriteria(): Promise<Criteria | null>
   /** Reads resume.json, the master resume for tailoring; null when there isn't one. */
   readResume(): Promise<Resume | null>
+  /** A config file's text and version (to detect edits made elsewhere); null when missing. */
+  readConfigFile(name: EditableFile): Promise<ConfigFile | null>
+  /**
+   * Saves a config file and returns its new version. `version` is the one it was read at
+   * (null for a new file); if the file changed since, throws ConfigConflictError.
+   */
+  writeConfigFile(
+    name: EditableFile,
+    text: string,
+    version: string | null,
+    message: string,
+  ): Promise<string>
+}
+
+/** The config files the app edits. */
+export type EditableFile = 'resume.json' | 'criteria.json' | 'tailoring-prompt.md'
+
+export interface ConfigFile {
+  text: string
+  /** GitHub's sha, or a hash of a local file's content. */
+  version: string
+}
+
+/** The file changed (on GitHub or on disk) after it was read for editing. */
+export class ConfigConflictError extends Error {
+  constructor(name: string, where: string) {
+    super(`${name} changed in ${where} since you opened it. Reload to get the latest version.`)
+    this.name = 'ConfigConflictError'
+  }
 }
 
 function withCompany(companies: Company[], company: Company): Company[] | null {
@@ -72,6 +102,26 @@ export class LocalConfigStore implements ConfigStore {
     const path = join(this.dir, 'resume.json')
     const text = await readOptional(path)
     return text === null ? null : parseResume(path, text)
+  }
+
+  async readConfigFile(name: EditableFile): Promise<ConfigFile | null> {
+    const text = await readOptional(join(this.dir, name))
+    return text === null ? null : { text, version: sha256(text, 16) }
+  }
+
+  /** The commit message is unused: a local folder has no history. */
+  async writeConfigFile(
+    name: EditableFile,
+    text: string,
+    version: string | null,
+    _message?: string,
+  ): Promise<string> {
+    const path = join(this.dir, name)
+    const current = await readOptional(path)
+    const currentVersion = current === null ? null : sha256(current, 16)
+    if (currentVersion !== version) throw new ConfigConflictError(name, this.describe)
+    await writeFile(path, text)
+    return sha256(text, 16)
   }
 }
 
@@ -126,5 +176,24 @@ export class GitHubConfigStore implements ConfigStore {
   async readResume(): Promise<Resume | null> {
     const file = await this.runner.getOptionalFile('config/resume.json')
     return file ? parseResume('config/resume.json', file.text) : null
+  }
+
+  async readConfigFile(name: EditableFile): Promise<ConfigFile | null> {
+    const file = await this.runner.getOptionalFile(`config/${name}`)
+    return file ? { text: file.text, version: file.sha } : null
+  }
+
+  async writeConfigFile(
+    name: EditableFile,
+    text: string,
+    version: string | null,
+    message: string,
+  ): Promise<string> {
+    try {
+      return await this.runner.putFile(`config/${name}`, text, version, message)
+    } catch (err) {
+      if (err instanceof GitHubConflictError) throw new ConfigConflictError(name, this.describe)
+      throw err
+    }
   }
 }

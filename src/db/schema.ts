@@ -141,6 +141,8 @@ export const tailoredResumes = sqliteTable(
     createdAt: text('created_at').notNull(),
     model: text('model').notNull(),
     resumeHash: text('resume_hash').notNull(),
+    /** Hash of the tailoring prompt used; null for versions made before prompts were editable. */
+    promptHash: text('prompt_hash'),
     jobHash: text('job_hash').notNull(),
     /** The tailoring, as JSON. */
     tailoring: text('tailoring').notNull(),

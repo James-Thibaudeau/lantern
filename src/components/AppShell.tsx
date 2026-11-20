@@ -107,6 +107,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           count={pendingSuggestions}
           onNavigate={onNavigate}
         />
+        <NavLink to="/resume" label="Resume" onNavigate={onNavigate} />
+        <NavLink to="/ranking" label="Ranking" onNavigate={onNavigate} />
         <NavLink to="/runs" label="Runs" onNavigate={onNavigate} />
       </nav>
 

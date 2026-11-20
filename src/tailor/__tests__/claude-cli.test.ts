@@ -4,7 +4,14 @@ import { join } from 'node:path'
 
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import { callClaude, ClaudeCliError, childEnv, claudeArgs, parseClaudeOutput } from '../claude-cli'
+import {
+  callClaude,
+  ClaudeCliError,
+  childEnv,
+  claudeArgs,
+  mainModel,
+  parseClaudeOutput,
+} from '../claude-cli'
 
 function cliJson(fields: Record<string, unknown>): string {
   return JSON.stringify({
@@ -204,5 +211,18 @@ process.exit(1)`,
     const err = await callClaude({ ...base, bin }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ClaudeCliError)
     expect(String(err)).toMatch(/wasn't found.*LANTERN_CLAUDE_BIN/)
+  })
+})
+
+describe('mainModel', () => {
+  it('picks the model that produced the most output, not the first listed', () => {
+    expect(
+      mainModel({
+        'claude-haiku-5-5': { inputTokens: 300, outputTokens: 40 },
+        'claude-opus-5-5': { inputTokens: 8000, outputTokens: 3200 },
+      }),
+    ).toBe('claude-opus-5-5')
+    expect(mainModel({ only: {} })).toBe('only')
+    expect(mainModel(undefined)).toBe('')
   })
 })

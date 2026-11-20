@@ -7,11 +7,12 @@ import { describe, expect, it } from 'vitest'
 import { LocalConfigStore } from '../../watchlist/runner-config'
 import { applyDecisions, listChanges } from '../changes'
 import { checkTailoring, numbersIn, termsIn } from '../check'
+import { SYSTEM_PROMPT } from '../prompt'
 import { renderResume } from '../render'
 import { ResumeSchema, parseResume, type Resume } from '../resume'
 import type { Tailoring } from '../schema'
 import { readTailoring, resumeFileName, storeTailoring } from '../stored'
-import { tailorResume, type TailorModel } from '../tailor'
+import { promptHash, tailorResume, type TailorModel } from '../tailor'
 
 const master: Resume = ResumeSchema.parse({
   basics: {
@@ -322,6 +323,30 @@ describe('tailorResume', () => {
     expect(r.tailoring.summary).toBe(master.summary)
     expect(r.checks.errors).toHaveLength(1)
     expect(r.model).toBe('fake')
+  })
+
+  it('sends the prompt it is given and records its hash', async () => {
+    const seen: string[] = []
+    const model: TailorModel = {
+      run: async ({ system }) => {
+        seen.push(system)
+        return { output: tailoring(), usage: null, model: 'fake' }
+      },
+    }
+    const posting = {
+      title: 'FE',
+      company: 'X',
+      locationText: '',
+      salary: null,
+      descriptionText: '',
+    }
+    const builtIn = await tailorResume(master, posting, model)
+    const custom = await tailorResume(master, posting, model, '  Be brief.\n')
+    expect(seen[0]).toBe(SYSTEM_PROMPT)
+    expect(seen[1]).toBe('Be brief.')
+    expect(custom.promptHash).toBe(promptHash('Be brief.'))
+    expect(custom.promptHash).not.toBe(builtIn.promptHash)
+    expect(custom.request).toContain('<posting>')
   })
 
   it('rejects a reply in the wrong shape', async () => {

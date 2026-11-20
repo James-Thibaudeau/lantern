@@ -1,0 +1,1 @@
+ALTER TABLE `tailored_resumes` ADD `prompt_hash` text;

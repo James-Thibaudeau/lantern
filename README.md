@@ -91,7 +91,7 @@ pnpm cli suggestions                                  # then: suggestions accept
 
 ## Ranking
 
-`/jobs` lists the best matches first, scored by `config/criteria.json` in your runner repo. Scoring is plain rules, so every point shows up as a reason when you open a job:
+`/jobs` lists the best matches first, scored by `config/criteria.json` in your runner repo. Edit it on the **Ranking** page, which previews how each change moves your top jobs before you save; saving commits the file and re-ranks straight away. Scoring is plain rules, so every point shows up as a reason when you open a job:
 
 - **`signals`**: `{ label, phrases[], weight, in? }`. If any phrase matches, `weight` is added once. Phrases are whole words, ignoring case, like the profile filter. `in` is `title`, `description`, `location` (the posting's location text, for a city) or `any` (title or description, the default). Use negative weights to push jobs down.
 - **`dealbreakers`**: `{ label, phrases[], in? }`. A match sinks the job to the bottom of the list, dimmed and labelled.
@@ -109,9 +109,11 @@ The app reads the criteria again on every Sync. To try changes in the app before
 
 ## Tailoring
 
-**Tailor resume** in a job's detail pane tailors your resume to that posting. It works from `config/resume.json` in your runner repo, your master resume as data: basics, summary, skill groups, and jobs whose bullets each have an `id`. Start from `runner-template/config/resume.example.json`.
+**Tailor resume** in a job's detail pane tailors your resume to that posting. It works from `config/resume.json` in your runner repo (edit it on the **Resume** page, with a live preview), your master resume as data: basics, summary, skill groups, and jobs whose bullets each have an `id`. Start from `runner-template/config/resume.example.json`.
 
 Tailoring never invents. The model may only pick, reorder and lightly reword your bullets, reorder skills, and rewrite the summary. Employers, titles, dates and education always come from `resume.json`. Code then checks the result: a reworded bullet can't contain a number its original doesn't, skills must already be in your resume, and bullets can't move between jobs. Anything that fails is dropped or reverted to your wording, and terms your resume never mentions are flagged for you to look at.
+
+The instructions Claude follows are editable too: **Resume → Tailoring prompt** saves them as `config/tailoring-prompt.md` (until then, Lantern's built-in prompt is used). **Try it** runs your draft prompt on one job and shows the result without saving anything. Each version records which prompt made it, and shows "Prompt changed since" when you've edited it since. Whatever the prompt says, the checks below still apply.
 
 You review each change (accept or revert), with a live preview. **Open** shows the resume as its own page to print to PDF (⌘P), and **Download HTML** saves it as a standalone file. Each run is kept as a version, and marking a job Applied records which version you used.
 
@@ -120,6 +122,8 @@ It runs the [Claude Code](https://code.claude.com) CLI (`claude -p`) on your Cla
 ```bash
 pnpm cli tailor 3fa2 --config ../lantern-runner/config   # tailor one job (id prefix) and print the changes
 ```
+
+Saving from the Resume or Ranking page commits to your runner repo on GitHub (or writes the local folder when `LANTERN_CONFIG_DIR` is set). If the file changed elsewhere since you opened it, the save stops and offers to reload. Afterwards your local runner checkout is behind: run `git pull` there before using `pnpm cli rank` or `pnpm cli tailor` with `--config`.
 
 ## Development
 

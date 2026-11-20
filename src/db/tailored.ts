@@ -9,6 +9,8 @@ export interface NewTailoring {
   model: string
   resumeHash: string
   jobHash: string
+  /** Hash of the tailoring prompt used. */
+  promptHash?: string | null
   tailoring: unknown
   checks: unknown
   usage?: unknown
@@ -25,6 +27,7 @@ export interface TailoredResume {
   model: string
   resumeHash: string
   jobHash: string
+  promptHash: string | null
   tailoring: unknown
   checks: unknown
   /** Change key → accepted. */
@@ -59,6 +62,7 @@ function toTailoredResume(row: TailoredResumeRow): TailoredResume {
     model: row.model,
     resumeHash: row.resumeHash,
     jobHash: row.jobHash,
+    promptHash: row.promptHash,
     tailoring: parseJson(row.tailoring),
     checks: parseJson(row.checks),
     decisions: parseDecisions(row.decisions),
@@ -84,6 +88,7 @@ export function insertTailoring(db: Db, t: NewTailoring): TailoredResume {
         model: t.model,
         resumeHash: t.resumeHash,
         jobHash: t.jobHash,
+        promptHash: t.promptHash ?? null,
         tailoring: JSON.stringify(t.tailoring ?? null),
         checks: JSON.stringify(t.checks ?? null),
         usage: t.usage === undefined ? null : JSON.stringify(t.usage),
