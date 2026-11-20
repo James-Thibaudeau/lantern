@@ -282,7 +282,7 @@ export function TailoredResume({
               aria-label="Version"
               value={view.id}
               onChange={(e) => void tailoring.showVersion(Number(e.target.value))}
-              className="h-7 rounded-md border border-line bg-surface px-2 text-xs"
+              className="select h-7 rounded-md border border-line bg-surface pl-2 text-xs"
             >
               {data.versions.map((v) => (
                 <option key={v.id} value={v.id}>

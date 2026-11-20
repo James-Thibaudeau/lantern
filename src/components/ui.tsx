@@ -145,3 +145,6 @@ export const tdClass = 'px-3 py-2'
 
 export const inputClass =
   'h-8 rounded-md border border-line bg-surface px-2.5 text-sm text-ink placeholder:text-muted focus:border-accent-500 focus:outline-none'
+
+/** For <select>: the input look plus a chevron inside the padding (see .select in styles.css). */
+export const selectClass = `select ${inputClass}`

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { formatDate } from '#/components/jobs/format'
 import { JobDetail } from '#/components/jobs/JobDetail'
 import { JobList } from '#/components/jobs/JobList'
-import { Callout, EmptyState, inputClass } from '#/components/ui'
+import { Callout, EmptyState, inputClass, selectClass } from '#/components/ui'
 import {
   ELIGIBILITY,
   ELIGIBILITY_LABEL,
@@ -252,7 +252,7 @@ function JobsPage() {
             onChange={(e) =>
               setSearch({ eligibility: EligibilitySchema.safeParse(e.target.value).data })
             }
-            className={`min-w-0 ${inputClass}`}
+            className={`min-w-0 ${selectClass}`}
           >
             <option value="">All locations</option>
             {eligibilities.map((e) => (
@@ -265,7 +265,7 @@ function JobsPage() {
             aria-label="Filter by company"
             value={search.company ?? ''}
             onChange={(e) => setSearch({ company: e.target.value || undefined })}
-            className={`min-w-0 ${inputClass}`}
+            className={`min-w-0 ${selectClass}`}
           >
             <option value="">All companies</option>
             {companies.map(([slug, name]) => (
@@ -281,7 +281,7 @@ function JobsPage() {
               onChange={(e) =>
                 setSearch({ sort: e.target.value === 'newest' ? 'newest' : undefined })
               }
-              className={`min-w-0 ${inputClass}`}
+              className={`min-w-0 ${selectClass}`}
             >
               <option value="score">Best match</option>
               <option value="newest">Newest</option>
