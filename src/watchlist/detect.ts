@@ -1,15 +1,18 @@
 import { decodeHTML } from 'entities'
 
+import { widgetUrl } from '#/pipeline/adapters/workable'
 import { HttpError, USER_AGENT, mapLimit, type HttpClient } from '#/pipeline/http'
 import { runIngest } from '#/pipeline/ingest'
 import type { Ats, Company, Profile } from '#/pipeline/schema'
 
 /** A job board found in a URL or page. */
 export interface Board {
-  /** One of our ATS ids, or another ATS we recognize but can't read (workable…). */
-  ats: Ats | 'workable' | 'smartrecruiters' | 'recruitee'
+  /** One of our ATS ids, or another ATS we recognize but can't read (SmartRecruiters). */
+  ats: Ats | 'smartrecruiters'
   slug: string
   workday?: { tenant: string; host: string; site: string }
+  /** "eu" for an EU-hosted Lever board. */
+  region?: 'eu'
   /** We have an adapter for it, so it can go on the watchlist. */
   supported: boolean
   note?: string
@@ -76,7 +79,7 @@ export function parseBoardUrl(raw: string): Board | null {
   }
   if (host === 'jobs.lever.co' && first) return { ats: 'lever', slug: first, supported: true }
   if (host === 'jobs.eu.lever.co' && first) {
-    return { ats: 'lever', slug: first, supported: false, note: 'EU-hosted Lever board' }
+    return { ats: 'lever', slug: first, region: 'eu', supported: true }
   }
   if (host === 'jobs.ashbyhq.com' && first && !SKIP_SLUGS.has(first)) {
     return { ats: 'ashby', slug: first, supported: true }
@@ -103,8 +106,8 @@ export function parseBoardUrl(raw: string): Board | null {
       note: 'BambooHR adapter not built yet',
     }
   }
-  if (host === 'apply.workable.com' && first) {
-    return { ats: 'workable', slug: first, supported: false, note: 'Workable isn’t supported' }
+  if (host === 'apply.workable.com' && first && first !== 'api' && first !== 'j') {
+    return { ats: 'workable', slug: first, supported: true }
   }
   if (host === 'jobs.smartrecruiters.com' && first) {
     return {
@@ -116,12 +119,7 @@ export function parseBoardUrl(raw: string): Board | null {
   }
   const recruitee = /^([\w-]+)\.recruitee\.com$/.exec(host)
   if (recruitee) {
-    return {
-      ats: 'recruitee',
-      slug: recruitee[1],
-      supported: false,
-      note: 'Recruitee isn’t supported',
-    }
+    return { ats: 'recruitee', slug: recruitee[1], supported: true }
   }
   return null
 }
@@ -273,13 +271,17 @@ export function looksLikeSameCompany(boardCompanyName: string, slug: string): bo
   return a.length > 0 && b.length > 0 && (a.includes(b) || b.includes(a))
 }
 
-/** Board name from Greenhouse's API; other ATSs don't expose one. */
+/** Board name from Greenhouse's or Workable's API; the others don't expose one. */
 async function boardName(http: HttpClient, board: Board): Promise<string | undefined> {
-  if (board.ats !== 'greenhouse') return undefined
+  const url =
+    board.ats === 'greenhouse'
+      ? `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board.slug)}`
+      : board.ats === 'workable'
+        ? widgetUrl(board.slug, false)
+        : undefined
+  if (!url) return undefined
   try {
-    const res = await http.getJson(
-      `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board.slug)}`,
-    )
+    const res = await http.getJson(url)
     if (typeof res === 'object' && res !== null && 'name' in res && typeof res.name === 'string') {
       return res.name.trim() || undefined
     }
@@ -294,15 +296,13 @@ function titleCase(slug: string): string {
 }
 
 export function toCompany(board: Board, name: string): Company | null {
-  if (!board.supported) return null
-  if (board.ats === 'workable' || board.ats === 'smartrecruiters' || board.ats === 'recruitee') {
-    return null
-  }
+  if (!board.supported || board.ats === 'smartrecruiters') return null
   return {
     name,
     ats: board.ats,
     slug: board.slug,
     ...(board.workday ? { workday: board.workday } : {}),
+    ...(board.region ? { region: board.region } : {}),
   }
 }
 
@@ -364,13 +364,14 @@ export function boardUrl(b: {
   ats: string
   slug: string
   workday?: Board['workday']
+  region?: 'eu'
 }): string | null {
   const s = encodeURIComponent(b.slug)
   switch (b.ats) {
     case 'greenhouse':
       return `https://job-boards.greenhouse.io/${s}`
     case 'lever':
-      return `https://jobs.lever.co/${s}`
+      return b.region === 'eu' ? `https://jobs.eu.lever.co/${s}` : `https://jobs.lever.co/${s}`
     case 'ashby':
       return `https://jobs.ashbyhq.com/${s}`
     case 'workday':

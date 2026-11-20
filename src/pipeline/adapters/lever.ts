@@ -7,7 +7,8 @@ import { toIso } from '../text'
 import { buildJob, parseRaw, requireCompany } from './build-job'
 import type { SourceAdapter } from './types'
 
-// https://github.com/lever/postings-api — public, no key.
+// https://github.com/lever/postings-api — public, no key. EU-hosted boards (region "eu")
+// use the same API on api.eu.lever.co.
 const RawJob = z.looseObject({
   id: z.string(),
   text: z.string(),
@@ -50,7 +51,8 @@ export const lever: SourceAdapter = {
 
   async fetch(company, { http }) {
     const c = requireCompany(company, 'lever')
-    const url = `https://api.lever.co/v0/postings/${encodeURIComponent(c.slug)}?mode=json`
+    const host = c.region === 'eu' ? 'api.eu.lever.co' : 'api.lever.co'
+    const url = `https://${host}/v0/postings/${encodeURIComponent(c.slug)}?mode=json`
     const res = z.array(z.unknown()).parse(await http.getJson(url))
     return { raw: res, complete: true }
   },

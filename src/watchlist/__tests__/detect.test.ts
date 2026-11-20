@@ -11,6 +11,7 @@ import {
   guessSlugs,
   looksLikeSameCompany,
   parseBoardUrl,
+  toCompany,
   type Board,
 } from '../detect'
 import { ashbyFixture, fakeHttp, profile } from './fakes'
@@ -50,7 +51,7 @@ describe('parseBoardUrl', () => {
     expect(parseBoardUrl('https://boards.greenhouse.io/')).toBeNull()
   })
 
-  it('reads Lever boards, and marks EU-hosted ones unsupported', () => {
+  it('reads Lever boards, including EU-hosted ones', () => {
     expect(parseBoardUrl('https://jobs.lever.co/fullscript/abc-123')).toEqual({
       ats: 'lever',
       slug: 'fullscript',
@@ -59,9 +60,15 @@ describe('parseBoardUrl', () => {
     expect(parseBoardUrl('https://jobs.eu.lever.co/acme')).toEqual({
       ats: 'lever',
       slug: 'acme',
-      supported: false,
-      note: 'EU-hosted Lever board',
+      region: 'eu',
+      supported: true,
     })
+    expect(
+      toCompany({ ats: 'lever', slug: 'acme', region: 'eu', supported: true }, 'Acme'),
+    ).toEqual({ name: 'Acme', ats: 'lever', slug: 'acme', region: 'eu' })
+    expect(boardUrl({ ats: 'lever', slug: 'acme', region: 'eu' })).toBe(
+      'https://jobs.eu.lever.co/acme',
+    )
   })
 
   it('reads Ashby boards and decodes the slug', () => {
@@ -98,20 +105,30 @@ describe('parseBoardUrl', () => {
       slug: 'acme',
       supported: false,
     })
-    expect(parseBoardUrl('https://apply.workable.com/acme/')).toMatchObject({
-      ats: 'workable',
-      slug: 'acme',
-      supported: false,
-    })
     expect(parseBoardUrl('https://jobs.smartrecruiters.com/Acme1')).toMatchObject({
       ats: 'smartrecruiters',
       slug: 'Acme1',
       supported: false,
     })
-    expect(parseBoardUrl('https://acme.recruitee.com/o/engineer')).toMatchObject({
+  })
+
+  it('reads Workable and Recruitee boards', () => {
+    expect(parseBoardUrl('https://apply.workable.com/acme/')).toEqual({
+      ats: 'workable',
+      slug: 'acme',
+      supported: true,
+    })
+    // Short job links and the API path aren't account slugs.
+    expect(parseBoardUrl('https://apply.workable.com/j/2FAA7C0BC6')).toBeNull()
+    expect(parseBoardUrl('https://acme.recruitee.com/o/engineer')).toEqual({
       ats: 'recruitee',
       slug: 'acme',
-      supported: false,
+      supported: true,
+    })
+    expect(toCompany({ ats: 'recruitee', slug: 'acme', supported: true }, 'Acme')).toEqual({
+      name: 'Acme',
+      ats: 'recruitee',
+      slug: 'acme',
     })
   })
 

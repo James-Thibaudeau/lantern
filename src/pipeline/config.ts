@@ -80,6 +80,7 @@ function companyLine(c: Company): string {
       `"workday": { "tenant": ${JSON.stringify(w.tenant)}, "host": ${JSON.stringify(w.host)}, "site": ${JSON.stringify(w.site)} }`,
     )
   }
+  if (c.region) fields.push(`"region": ${JSON.stringify(c.region)}`)
   return `  { ${fields.join(', ')} }`
 }
 

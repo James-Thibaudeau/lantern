@@ -25,7 +25,7 @@ gh workflow run run.yml -f dryRun=true
 | Path                        | What it is                                                                                                 |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `.github/workflows/run.yml` | Daily schedule plus a manual trigger. Calls `James-Thibaudeau/lantern/.github/workflows/ingest.yml@v1`     |
-| `config/companies.json`     | Watchlist: `{ name, ats, slug, workday?: { tenant, host, site } }[]`                                       |
+| `config/companies.json`     | Watchlist: `{ name, ats, slug, region?: "eu", workday?: { tenant, host, site } }[]`                        |
 | `config/profiles.json`      | Profiles for the early filter: `id`, `enabled`, `titleInclude[]`, `titleExclude[]`, `allowedEligibility[]` |
 | `config/criteria.json`      | Ranking for the app: `signals[]`, `dealbreakers[]`, `eligibility` points, `salary` floor                   |
 | `config/resume.json`        | Your master resume for tailoring: basics, summary, skill groups, jobs with bullet `id`s                    |
@@ -45,7 +45,7 @@ gh workflow run run.yml -f dryRun=true
 
 ### `companies.json`
 
-`ats` is one of `greenhouse`, `lever`, `ashby` (supported now), `workday`, `bamboohr` (coming later; such companies are skipped until then). `slug` is the board name in the job-board URL, for example `gitlab` in `boards.greenhouse.io/gitlab`.
+`ats` is one of `greenhouse`, `lever`, `ashby`, `workable`, `recruitee` (supported), or `workday`, `bamboohr` (skipped: Workday's career sites block scripted clients, and BambooHR isn't built yet). A Lever board on `jobs.eu.lever.co` also needs `"region": "eu"`; `pnpm cli detect-ats <url> --add` fills that in. `slug` is the board name in the job-board URL, for example `gitlab` in `boards.greenhouse.io/gitlab`.
 
 ### `profiles.json`
 

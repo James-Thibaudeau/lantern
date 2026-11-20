@@ -2,7 +2,7 @@
 
 Lantern finds job postings on company job boards, keeps the ones that match what you're looking for, and shows them in a small local app.
 
-It reads the public job-board APIs that companies already publish (Greenhouse, Lever and Ashby today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
+It reads the public job-board APIs that companies already publish (Greenhouse, Lever including EU-hosted boards, Ashby, Workable and Recruitee today), so there's no scraping and no API keys. A GitHub Action fetches every company on your watchlist once a day, and the app on your laptop picks up the results.
 
 > **Status:** ingestion, the daily Action, local sync into SQLite, watchlist tools, rules-based ranking, a job inbox (Interested / Applied / Dismissed) and resume tailoring work end to end.
 
@@ -84,7 +84,7 @@ pnpm cli hn-suggest                                   # companies from HN's late
 pnpm cli suggestions                                  # then: suggestions accept|reject <id>
 ```
 
-- **`detect-ats`** reads a board link directly (Greenhouse, Lever, Ashby; Workday, BambooHR and a few others are recognized but not supported yet). For a company's own site, it looks for a board linked in the page, then tries the company name as a slug on each board. Every result is checked against the real API: how many jobs are open, and how many pass your profile today.
+- **`detect-ats`** reads a board link directly (Greenhouse, Lever including EU-hosted boards, Ashby, Workable and Recruitee; Workday, BambooHR and SmartRecruiters are recognized but can't be read: Workday's career sites block scripted clients). For a company's own site, it looks for a board linked in the page, then tries the company name as a slug on each board. Every result is checked against the real API: how many jobs are open, and how many pass your profile today.
 - **`hn-suggest`** reads the latest HN "Who is hiring?" thread, keeps posts that mention Canada or remote work, finds each company's board the same way, and saves the new ones as suggestions, sorted by matching jobs. Companies you've accepted or rejected aren't suggested again.
 - **Guessed boards** are labelled, since another company can own the same slug. Greenhouse reports a board's company name, so a guessed Greenhouse board whose name doesn't fit is dropped; for Ashby and Lever, open the board to check.
 - The **`/watchlist`** page does all of this in the app: add from a URL, check HN, and accept or reject suggestions. Accepting commits one line to `config/companies.json` in your runner repo (the token needs Contents read/write); the next run picks it up. Every command also takes `--config <dir>` to use a local folder instead.

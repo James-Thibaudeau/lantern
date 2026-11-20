@@ -2,7 +2,15 @@ import { z } from 'zod'
 
 // ---------- Config (lives in the private runner repo) ----------
 
-export const ATS = ['greenhouse', 'lever', 'ashby', 'workday', 'bamboohr'] as const
+export const ATS = [
+  'greenhouse',
+  'lever',
+  'ashby',
+  'workday',
+  'bamboohr',
+  'workable',
+  'recruitee',
+] as const
 export type Ats = (typeof ATS)[number]
 
 export const CompanySchema = z.object({
@@ -10,6 +18,8 @@ export const CompanySchema = z.object({
   ats: z.enum(ATS),
   slug: z.string().min(1),
   workday: z.object({ tenant: z.string(), host: z.string(), site: z.string() }).optional(),
+  /** "eu" for a Lever board hosted in the EU (jobs.eu.lever.co). */
+  region: z.enum(['eu']).optional(),
 })
 export type Company = z.infer<typeof CompanySchema>
 
@@ -73,6 +83,8 @@ export const SourceIdSchema = z.enum([
   'workday',
   'remotive',
   'bamboohr',
+  'workable',
+  'recruitee',
 ])
 export type SourceId = z.infer<typeof SourceIdSchema>
 
